@@ -433,12 +433,12 @@ A-MEM（写入时）:
 
 #### 3) Memory Safety — 记忆安全
 
-- **定义**：Memory 的投毒、泄露、幻觉固化（`agent-infra-research` 附录 Safety 的延伸）。
+- **定义**：Memory 的投毒、泄露、幻觉固化（[理论卷附录 TD](./theory/appendix-d.md) Safety 的延伸）。
 - **风险**：
   - **投毒**：恶意工具输出写入 Memory，后续检索污染所有会话（类似 Prompt Injection 的持久化版本）。
   - **泄露**：Memory 跨会话携带敏感信息（`~/.claude/projects/<hash>/memory/` 若未隔离则跨项目泄露）。
   - **固化**：错误记忆经 Evolution 被“洗白”为事实，难以纠正。
-- **对策**：`ContextHygiene.sanitize_tool_output`（`agent-infra` 提出）+ 写入时校验（A-MEM 的 Link 阶段加 `contradicts` 边即一种校验）+ 遗忘作为安全阀（FadeMem 的快速衰减可“自然排毒”）。
+- **对策**：[理论卷 T4](./theory/chapter-04-runtime.md) 提出的 `ContextHygiene.sanitize_tool_output`+ 写入时校验（A-MEM 的 Link 阶段加 `contradicts` 边即一种校验）+ 遗忘作为安全阀（FadeMem 的快速衰减可“自然排毒”）。
 - **七家对位**：OpenCode `permission:* deny` 的隐藏 agent 与 Grok `SENT_BEARER_PREFIX_LEN=12` 的截断，都是 Memory Safety 的雏形。
 
 #### 4) 端侧 Memory 小模型化
