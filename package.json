@@ -1,0 +1,15 @@
+{
+  "name": "agent-deep-research",
+  "version": "1.0.0",
+  "private": true,
+  "description": "七家 Agent 实现思想对比 — mdBook",
+  "type": "module",
+  "scripts": {
+    "book:serve": "mdbook serve --open",
+    "book:build": "mdbook build",
+    "book:test": "mdbook test",
+    "book:clean": "mdbook clean"
+  },
+  "keywords": ["agent", "infra", "mdbook", "claude-code", "codex", "opencode"],
+  "license": "MIT"
+}
