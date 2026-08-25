@@ -84,15 +84,18 @@
 | `crates/codegen/xai-grok-agent/src/agent.rs AgentBuilder` | 30+ 流式配置 |
 | `crates/codegen/xai-fast-worktree` | `btrfs/overlay` 快速分支 |
 
-## Infra 研究 (`agent-infra-research`)
+## 理论卷（`src/theory/`，原 agent-infra-research，2026-08 并入）
 
 | 锚点 | 说明 |
 |------|------|
-| `src/chapter-01-landscape.md` | 六组件模型 + 五约束 |
-| `src/chapter-02-memory.md` | MemGPT/A-MEM/FadeMem + 写入时代理 |
-| `src/chapter-03-context.md` | Token 经济学 + Prompt Caching + 摘要五类型 |
-| `src/chapter-04-runtime.md` | FSM vs while + `my-agent` 基线 |
-| `src/chapter-07-roadmap.md` | 7 章学习路径 |
+| `src/theory/chapter-01-landscape.md` | 六组件模型 + 五约束 |
+| `src/theory/chapter-02-memory.md` | MemGPT/A-MEM/FadeMem + 写入时代理 + 不可能三角 |
+| `src/theory/chapter-03-context.md` | Token 经济学 + Prompt Caching + 摘要五类型 |
+| `src/theory/chapter-04-runtime.md` | FSM vs while + `my-agent` 基线 |
+| `src/theory/chapter-05-industry.md` | 行业岗位信号（ByteDance Memory Infra JD 解读） |
+| `src/theory/chapter-06-ecosystem.md` | 框架/向量库/标准化生态图谱 |
+| `src/theory/appendix-b.md` | **被否决的观点及原因**（负知识，源码卷无对位） |
+| `src/theory/appendix-d.md` / `appendix-e.md` | Safety/Federated Memory；多模态 Memory 与端侧推理 |
 
 ---
 

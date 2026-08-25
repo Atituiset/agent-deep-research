@@ -20,7 +20,7 @@
 | pi | `/home/atituiset/Projects/pi` | `packages/{agent,ai,coding-agent,server,storage,tui}/` 5 包 | `packages/agent/src/agent-loop.ts:155 runLoop` |
 | deepseek-harness | `/home/atituiset/Projects/deepseek-harness` | `packages/*` 60+ 包, `Cordis` | `apps/cli/src/bin.ts` + `preset.yml` |
 | grok-build | `/home/atituiset/Projects/grok-build` | `crates/codegen/*` 50+ crate | `xai-grok-agent::AgentBuilder` |
-| agent-infra | `/home/atituiset/Projects/agent-infra/agent-infra-research/src/` | mdBook 7 章 + 5 附录, 4126 行 | `book.toml` |
+| agent-infra | `/home/atituiset/Projects/agent-infra/agent-infra-research/src/` | mdBook 7 章 + 5 附录, 4126 行 | `book.toml`（**2026-08 已全量并入本书卷 VI `src/theory/`，原仓库可归档**） |
 
 ## D.3 高频引用文件清单（便于增量 diff）
 

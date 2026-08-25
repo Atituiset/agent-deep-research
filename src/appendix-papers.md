@@ -40,6 +40,9 @@
 | **Letta**（MemGPT 团队产品化） | 2024.10 | 论文→SDK 的分叉样本；Memory Blocks 块化存储 | Ch6 §6.1.2 |
 | FAISS 向量检索库 | Johnson et al., 2017（Meta 开源） | IVF/PQ/HNSW——一切向量记忆的地基 | Ch6 §6.1.4 |
 | **Zep**: A Temporal Knowledge Graph Architecture for Agent Memory | Rasmussen et al., arXiv:2501.13956, 2025 | 时序知识图谱记忆分支的代表 | Ch6 §6.1.4 |
+| **FadeMem**: Biologically-Inspired Forgetting for Efficient Agent Memory | arXiv:2601.18642, 2026 | 艾宾浩斯衰减 + 强化回放 + 重要性门控的可微公式（编号见理论卷附录 TC） | Ch6 §6.1.3 |
+| **Memory in the LLM Era**: Modular Architectures and Strategies | arXiv:2604.01707, 2026（VLDB 投稿预印本） | 五维分类 × 四范式框架——本书 Ch6 分类学的直接来源 | Ch6 §6.2 |
+| **memorywire**: A Vendor-Neutral Wire Format | arXiv:2606.01138, 2026 | Memory 互操作线缆：`MemoryBlock / MemoryStream / MemoryProvider`——"Memory 的 MCP 时刻" | Ch6 §6.5 |
 
 ## E.4 Multi-Agent / 规划线（精读见 Ch9 §9.1）
 
@@ -94,4 +97,4 @@
 | **Effective Context Engineering for AI Agents**（博客） | Anthropic, 2025 | 注意力预算隐喻与压缩触发阈值的工程化 | Ch14 交锋C |
 | **DeepSeek-R1**: Incentivizing Reasoning Capability in LLMs via RL | DeepSeek-AI, arXiv:2501.12948, 2025 | RL 内化长链推理——"模型侧吞并 Harness"论的证据之一 | Ch14 §14.5 |
 
-> **核验状态说明**：以上条目的 arXiv 编号与 venue 已于 2026-08-24 经网络/知识库双重抽查（ReAct/MemGPT/A-MEM/Mem0/SWE-bench/Tau-bench 等 20 余篇）；Ch6 引用的 FadeMem (2026.02)、Memory in LLM Era 综述 (2026.03)、memorywire 标准 (2026.04) 暂无公开编号可查，保留原书表述并标记为待核验。新增或修正一律登记到附录 D.8。
+> **核验状态说明**：以上条目的 arXiv 编号与 venue 已于 2026-08-24 经网络/知识库双重抽查（ReAct/MemGPT/A-MEM/Mem0/SWE-bench/Tau-bench 等 20 余篇）；FadeMem / Memory in LLM Era / memorywire 三篇的编号取自理论卷附录 TC（原 agent-infra-research 参考来源清单，2026-08 并入卷 VI）。新增或修正一律登记到附录 D.8。

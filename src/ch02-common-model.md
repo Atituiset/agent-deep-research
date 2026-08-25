@@ -175,7 +175,7 @@ Retry/Attribution（重试 + 401 归因 + 计费分离）
 
 ## 2.3 五大约束（形式化）
 
-Agent Infra 要同时解的五道题（`agent-infra-research/src/chapter-01-landscape.md` 的框架，在本书七码一书对照中全部命中）：
+Agent Infra 要同时解的五道题（[理论卷 T1](./theory/chapter-01-landscape.md) 的框架，在本书七码一书对照中全部命中）：
 
 | 约束 | 形式化 | 典型解法 | 失效症状 |
 |------|--------|---------|---------|
@@ -185,7 +185,7 @@ Agent Infra 要同时解的五道题（`agent-infra-research/src/chapter-01-land
 | 可组合 | `Tools × Agents × Envs` 笛卡尔积 | 注册表 + 命名空间 + 隔离 | 工具名冲突、文件并发写冲突 |
 | 成本 | `Cost_turn = cached×p_cached + uncached×p_uncached + output×p_out` | Caching + 摘要 + 智能检索 | 无缓存时 20 轮成本指数增长 |
 
-**成本算例**（`agent-infra-research/src/chapter-03-context.md` 的 Token 经济学）：
+**成本算例**（[理论卷 T3](./theory/chapter-03-context.md) 的 Token 经济学）：
 
 ```
 模型 Opus 200K, $15/$75 per 1M

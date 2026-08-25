@@ -51,7 +51,7 @@ timeline
 | **2026.02** | **FadeMem** — (生物启发衰减, 2026) | 艾宾浩斯遗忘曲线 + 强化回放 + 重要性门控的动态衰减，支持“自然遗忘” | Memory 的“遗忘”有了可微公式 | Grok `memory_flush` 与 DeepSeek `compaction-tool-result-pruner` 的遗忘策略的理论底座 |
 | **2026.03** | **Memory in the LLM Era** — 综述 (2026) | 系统化五维分类（时间×类型×组织×代理权×演化）与四范式框架 | 本章 6.2 的分类学直接来源 | 全书 Memory 术语的收敛锚点 |
 | **2026.04** | **memorywire** — 标准 (2026) | 定义 Memory 的互操作线缆：`MemoryBlock / MemoryStream / MemoryProvider` 接口，跨 Agent 携带 | Memory 的“MCP 时刻” | 预判七家将从私有 Session 格式向标准 Provider 收敛（见 6.5） |
-| **2023-2026** | **Zep / Cognee** — 图记忆 lineage | Zep：时序知识图谱（Temporal KG）+ 事实抽取；Cognee：代码/文档的图谱化 Memory | 图存储的 Memory 分支 | `agent-infra-research/src/chapter-02-memory.md` 视为向量/图双轨的收敛点 |
+| **2023-2026** | **Zep / Cognee** — 图记忆 lineage | Zep：时序知识图谱（Temporal KG）+ 事实抽取；Cognee：代码/文档的图谱化 Memory | 图存储的 Memory 分支 | [理论卷 T2](./theory/chapter-02-memory.md) 视为向量/图双轨的收敛点 |
 
 > 年份标注原则：以 arXiv 首发或会议录用年为准；Letta 与 MemGPT 为同一团队的“论文→产品”分叉，故并列 2024.10。
 
@@ -79,7 +79,7 @@ timeline
          函数调用 = 系统中断，LLM 自主决定换页
 ```
 
-**可抄的工程点**（`agent-infra-research/src/chapter-02-memory.md` 亦强调）：
+**可抄的工程点**（[理论卷 T2](./theory/chapter-02-memory.md) 亦强调）：
 - **中断式换页**：不是外部定时器触发，而是 LLM 通过 `function_call` 自主发起 `memory_search / memory_append`，对应 Claude `compactConversation()` 前的 `PreCompact hooks` 与 Grok `CompactionPolicy{wall_clock_budget_secs:300}` 的“模型自感知阈值”。
 - **分层驱逐**：FIFO 队列的头/尾/锚点保留（Claude `compact_boundary.preservedSegment{head/tail/anchor}`）即 OS 的“常驻页”思想。
 - **失败回退**：论文若检索失败则回退到截断；Claude `trySessionMemoryCompaction() → compactConversation()` 的两级回退同构。
@@ -194,7 +194,7 @@ Fixed Memory:  智能在“规则”    ── 人写规则
 Agentic Memory:智能在“写入时”  ── 写入时 Agent 已决定组织与演化  ← A-MEM 的主张
 ```
 
-> 关键洞见（`agent-infra-research/src/chapter-02-memory.md` 亦强调）：**RAG 与 Agentic Memory 不是替代，而是分层**。向量 RAG 适合“召回”，Agentic Memory 适合“织网与演化”。生产系统常见叠加：Mem0/Letta 用向量做粗召回，用 A-MEM 的 Link/Evolution 做精排与重写。
+> 关键洞见（[理论卷 T2](./theory/chapter-02-memory.md) 亦强调）：**RAG 与 Agentic Memory 不是替代，而是分层**。向量 RAG 适合“召回”，Agentic Memory 适合“织网与演化”。生产系统常见叠加：Mem0/Letta 用向量做粗召回，用 A-MEM 的 Link/Evolution 做精排与重写。
 
 ### 6.2.3 写入时 vs 检索时：代理权的镜像
 
@@ -275,7 +275,7 @@ A-MEM（写入时）:
         └─► session-projection-cache: 缓存上次投影结果，增量更新（类似 Claude 的 cache 前缀复用）
               + compaction-basic (摘要) + compaction-tool-result-pruner (按 tool_result 剪枝)
   ```
-- **可抄**：`Revision + WriteBehind` 延迟写但保证 `turn/start` 边界不丢（`agent-infra-research/src/chapter-04-runtime.md` 的“追加优于覆盖”）；`Inbox.splice(next-turn vs next-step)` 让 Memory 投影可在 `maintenance` 阶段安全重算，不与 `running` 的 step 竞争。
+- **可抄**：`Revision + WriteBehind` 延迟写但保证 `turn/start` 边界不丢（[理论卷 T4](./theory/chapter-04-runtime.md) 的“追加优于覆盖”）；`Inbox.splice(next-turn vs next-step)` 让 Memory 投影可在 `maintenance` 阶段安全重算，不与 `running` 的 step 竞争。
 - **与 A-MEM 的距离**：投影是检索时，虽有 cache 但无写入时的 Link/Evolution；若要补齐，需在 `Session.append` 后加 `Note/Link` 异步任务（Lab 思路）。
 
 #### OpenCode — 隐藏 Agent 的 Compaction
@@ -289,7 +289,7 @@ A-MEM（写入时）:
         │
         └─► compaction 专用子 agent（mode:hidden, permission:* deny）
               ├─ 读取全量 → 生成 summary/title → 写回 Session
-              └─ 权限 * deny 保证不触文件，隔离干净（`agent-infra-research/src/chapter-03-context.md` 的“摘要隔离”最佳实践）
+              └─ 权限 * deny 保证不触文件，隔离干净（[理论卷 T3](./theory/chapter-03-context.md) 的“摘要隔离”最佳实践）
   ```
 - **可抄**：把 Compaction 做成“子 agent”而非函数，天然获得隔离、重试、Trace；`Truncate.wrap()` 在工具层统一截断，白名单与截断同源，避免“某工具绕过截断”导致 context 爆炸（Ch4 已述）。
 - **局限**：隐藏 agent 的摘要仍是“压缩”，非“记忆织网”； procedural Memory（skill）与 episodic Memory（对话事实）分属两套存储，未统一为图。
@@ -334,7 +334,7 @@ A-MEM（写入时）:
 |------|-----|-------------------|----------------|
 | **问题** | “外部知识库里有答案” | “过去的交互中有答案” | RAG 适合文档 QA；Memory 适合“你上次说过…” |
 | **写入** | 切块→向量入库（无智能） | Note/Link/Evolution（有智能） | DeepSeek `session-projection-cache` 偏 RAG；Grok `xai-grok-memory` 偏 Memory |
-| **检索** | 向量近邻（单跳） | 图游走（多跳） | `agent-infra-research/src/chapter-02-memory.md` 的“向量为召回、图为推理” |
+| **检索** | 向量近邻（单跳） | 图游走（多跳） | [理论卷 T2](./theory/chapter-02-memory.md) 的“向量为召回、图为推理” |
 | **评估** | Recall@k / MRR | LongBench / LoCoMo（多会话一致性） | 七家均未内建 LongBench 评测，依赖外部 harness |
 | **叠加** | 粗召回 | 精排与重写 | 生产推荐：RAG 做候选，Memory 做精排与冲突消解（Mem0 + A-MEM 混合） |
 
@@ -354,7 +354,7 @@ A-MEM（写入时）:
 
 ### 6.4.1 Memory Pipeline 五步
 
-任意 Memory 系统均可映射为五步流水线（`agent-infra-research/src/chapter-02-memory.md` 与《Memory in LLM Era》综述的收敛）：
+任意 Memory 系统均可映射为五步流水线（[理论卷 T2](./theory/chapter-02-memory.md) 与《Memory in LLM Era》综述的收敛）：
 
 ```
 ┌──────────┐   ┌─────────┐   ┌──────────┐   ┌───────────┐   ┌───────────┐
@@ -426,7 +426,7 @@ A-MEM（写入时）:
 
 #### 2) Multi-modal Memory — 多模态记忆
 
-- **定义**：Memory 从文本扩展到图像、语音、轨迹、GUI 操作（`agent-infra-research/src/chapter-02-memory.md` 的开放问题）。
+- **定义**：Memory 从文本扩展到图像、语音、轨迹、GUI 操作（[理论卷 T2](./theory/chapter-02-memory.md) 的开放问题）。
 - **形态**：`note{content: text|image|audio, embedding: multi-modal}` + 跨模态 Link（如“这张截图对应那段报错日志”）。
 - **挑战**：跨模态对齐、存储成本、检索时的模态路由。
 - **信号**：Claude 的 `IMAGE_TOKEN_ESTIMATE` 与 Grok `estimate_item_tokens` 已为多模态预留估算；Zep 的时序 KG 可自然扩展为多模态边。
@@ -603,5 +603,5 @@ function decay(graph: MemoryGraph, now = Date.now()) {
 
 - 论文：MemGPT arXiv 2310.08560 (2023), Voyager arXiv 2305.16291 (2023), Generative Agents UIST 2023 (Stanford), Mem0 arXiv 2504.19413 (2025.04；开源 2024.10), Letta 2024.10, A-MEM arXiv 2502.12110 / NeurIPS 2025, FadeMem 2026.02, Memory in LLM Era 综述 2026.03, memorywire 2026.04, FAISS 2017, Zep arXiv 2501.13956 (2025) / Cognee 2023-2024
 - 源码：`claude-code-haha/src/services/compact/compact.ts:387`, `xai-grok-memory`, `xai-grok-agent/src/compaction.rs:CompactionPolicy`, `xai-chat-state/src/actor/state.rs:estimate_item_tokens`, `deepseek-harness/packages/session/session-projection-cache`, `packages/compaction/compaction-basic`, `opencode/packages/opencode/src/agent/agent.ts:35`, `packages/opencode/src/tool/truncate.ts`, `codex-rs/core/src/context_manager/history.rs:93`, `pi/packages/agent/src/agent-loop.ts:155 runLoop`, `pi/docs/book/12-memory-projection.md`
-- 衔接：`agent-infra-research/src/chapter-02-memory.md` (MemGPT/A-MEM/FadeMem) + `src/chapter-03-context.md` (Token 经济学与摘要)
+- 衔接：[理论卷 T2](./theory/chapter-02-memory.md) (MemGPT/A-MEM/FadeMem) + `src/chapter-03-context.md` (Token 经济学与摘要)
 

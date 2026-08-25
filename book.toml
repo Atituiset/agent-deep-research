@@ -1,6 +1,6 @@
 [book]
-title = "Agent Deep Research — 七家 Agent 实现思想对比"
-description = "Agent Infra 知识地图：以 Claude Code / Codex / Grok / DeepSeek / OpenCode / Pi / Claw / Qwen-Agent 八家实现为教材，每章按「论文脉络 → 原理深潜 → 源码对证 → 权衡结论 → 未来方向」五段式展开，配四阶段动手 Lab 与一页纸速查"
+title = "Agent Deep Research — 九家 Agent 实现思想对比"
+description = "Agent Infra 知识地图：以 Claude Code / Codex / Grok / DeepSeek / OpenCode / Pi / Claw / Qwen-Agent / Hermes 九家实现为教材，每章按「论文脉络 → 原理深潜 → 源码对证 → 权衡结论 → 未来方向」五段式展开，配四阶段动手 Lab 与一页纸速查；原 agent-infra-research 已并入为卷 VI 理论底座"
 authors = ["agent-deep-research"]
 language = "zh-CN"
 multilingual = false
