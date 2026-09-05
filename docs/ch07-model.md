@@ -88,7 +88,7 @@ Responses (OpenAI 2024-09, xAI 2025)
 
 ### 8.1.3 为什么要按此脉络读源码
 
-- 读 OpenCode `packages/opencode/src/provider/provider.ts:100` 的 `BundledSDK` 时，问自己：若无 2023-06 的 Function Calling 统一 `tool_calls{id,name,arguments}` 三元组，`LanguageModelV3` 如何用单一形状适配 10+ Provider？
+- 读 OpenCode `packages/opencode/src/provider/provider.ts:101` 的 `BundledSDK` 时，问自己：若无 2023-06 的 Function Calling 统一 `tool_calls{id,name,arguments}` 三元组，`LanguageModelV3` 如何用单一形状适配 21 Provider？
 - 读 Grok `xai-grok-sampler/src/lib.rs:SamplingClient` 的六端点 `match api_backend { ChatCompletions|Responses|Messages }` 时，对照 2024-09 的 Responses 分化：为何 `stream: true` 的 SSE 事件名在三协议下完全不同（`choices.delta` vs `content_block_delta` vs `response.output_item.delta`），却能在 `deserialize_response_event()` 后收敛为同一 `StreamChunk`？
 - 读 DeepSeek `packages/llm/llm/src/assembler.ts:BlockAssembler` 时，注意 2024-12 的 `reasoning_effort` 如何让 `Chunk{type: 'reasoning'|'text'|'tool_use'}` 从两态变为三态——这解释了为何 Adapter 必须显式处理 `reasoning` 累积器而非仅 `tool_use`。
 
@@ -577,7 +577,7 @@ auth_callback.record_401(SamplingConsumer::Sampler, prefix);
 |----|---------|----------|-------------|-----------|------------|------|
 | **Claude** | 单 SDK 封装 + Bedrock/Vertex 分支 | `src/services/api/claude.ts:queryModelWithStreaming()` + `src/utils/model/model.ts:getMainLoopModel()` + `src/services/api/bedrock.ts` | `Anthropic` 主 + `Bedrock/Vertex` 兼容（`ANTHROPIC_BEDROCK_BASE_URL` 分支） | `Messages` 单协议 + `cache_control: ephemeral` | `FallbackTriggeredError` + `streamingFallbackOccured` 时 `tombstone` 旧消息并 `stripSignatureBlocks()` + `attemptWithFallback` | `ANTHROPIC_API_KEY` 直连 |
 | **Codex** | `model-provider` 三件套 + `login` | `codex-model-provider/` + `model-provider-info/` + `models-manager/` + `login/` + `codex-rs/core/src/tools/spec_plan.rs:117 build_tool_router()` | `openai/chatgpt/lmstudio/ollama/aws-auth`（`feature.Feature` 注册表驱动） | `ChatCompletions` 主 + `Responses` 兼容 | `responses_retry.rs` 指数退避 + 降级 + `model-provider-info` 的 `ModelInfo{model,reasoning_effort,approval_policy}` | `codex-rs/login/` 多源 `getApiKey` |
-| **OpenCode** | `BundledSDK` AI SDK 统一 | `packages/opencode/src/provider/provider.ts:100+` + `packages/llm/src/` + `packages/opencode/src/provider/transform.ts:ProviderTransform` | **10+ provider**：`@ai-sdk/anthropic/openai/google/azure/amazon-bedrock/openai-compatible/openrouter/xai/mistral/vertex`（`@opencode-ai/plugin` 动态 `import()`） | `LanguageModelV3.doGenerate/doStream` 统一流/非流 | `wrapSSE(headerTimeout/SSE read timeout)` + `AbortController` + `ProviderTransform` | `getApiKey(provider)` + `googleVertexAnthropicBaseURL()` 多 region |
+| **OpenCode** | `BundledSDK` AI SDK 统一 | `packages/opencode/src/provider/provider.ts:101+` + `packages/llm/src/` + `packages/opencode/src/provider/transform.ts:ProviderTransform` | **10+ provider**：`@ai-sdk/anthropic/openai/google/azure/amazon-bedrock/openai-compatible/openrouter/xai/mistral/vertex`（`@opencode-ai/plugin` 动态 `import()`） | `LanguageModelV3.doGenerate/doStream` 统一流/非流 | `wrapSSE(headerTimeout/SSE read timeout)` + `AbortController` + `ProviderTransform` | `getApiKey(provider)` + `googleVertexAnthropicBaseURL()` 多 region |
 | **Pi** | `pi-ai` 极简抽象 | `packages/ai/src/` `@earendil-works/pi-ai` + `packages/agent/src/types.ts:StreamFn` | `Anthropic/OpenAI/Google/Mistral/Aws`（`Api/Model/Context/Tool` 四抽象） | `ChatCompletions/Messages` 双协议（`pi-ai` 内封装） | 可注入 `RetryPolicy`（`AgentLoopConfig` 回调） | `getApiKey(provider)` 动态取短时 OAuth token |
 | **DeepSeek** | `dsh-llm` 三适配器 + 显式剥除 | `packages/llm/*` `dsh-llm{LlmCallConfig,PreparedLlmCall,StreamChunk}` + `llm-retry` + `llm-pi-ai` + `assembler.ts:BlockAssembler` | `deepseek/pi-ai/retry` 三适配器（`prepareCall(config,signal)→{config,adapterDefaults,retryPolicy,context}`） | `ChatCompletions` 主 + `StreamChunk/BlockAssembler` 归一 | `adapter-failure.ts:normalizeLlmFailure()` + `errorChain()` → `LlmError{failure{message,code,status,retryAfterMs,requestId}}` + `api-key.ts:normalizeApiKey(){^[\x21-\x7E]+$}` + `waterfall 'agent/request-error'` | `normalizeApiKey` 字符集校验 |
 | **Grok** | `SamplingClient` 六端点 + 全量透传 | `xai-grok-sampler/src/lib.rs SamplingClient` + `xai-grok-models` + `xai-grok-auth` + `xai-grok-tools/src/bridge.rs ToolBridge` | **三后端×流/非流=六端点**：`chat_completions/responses/messages × stream/non-stream` | `chat_completions/responses/messages` 三协议 + `deserialize_response_event()` 容忍 `x_search` | `SENT_BEARER_PREFIX_LEN=12` 截断 + `Auth401AttributionCallback{record_401(consumer: SamplingConsumer{...}, sent_bearer_prefix)}` + `truncate_to_prefix` | `xai-grok-auth`（`x-api-key/Authorization` + 401 归因） |
@@ -635,7 +635,7 @@ async function attemptWithFallback<T>(fn: () => Promise<T>, fallbackModel?: stri
 **精读点**：
 
 - **为何选单 SDK**：Claude 早期仅需跑通 Anthropic 主链路，`Bedrock/Vertex` 仅为"兼容分支"（`if baseURL contains bedrock`），模型切换靠 `getMainLoopModel()` 的配置而非 Provider 路由——这是"单 SDK 直连"的典型：**快，但每新增一 Provider 就多一分支**。
-- **`cache_control: ephemeral` 的位置**：在 `claude.ts:606 getCacheControl()` 中按 `querySource` 决定 `ttl: 5m|1h`，且 `system/tools/history` 三断点均显式标记，是 Prompt Caching 最精细的实现（见 Ch5）。
+- **`cache_control: ephemeral` 的位置**：在 `claude.ts:361 getCacheControl()` 中按 `querySource` 决定 `ttl: 5m|1h`，且 `system/tools/history` 三断点均显式标记，是 Prompt Caching 最精细的实现（见 Ch5）。
 - **Fallback 的代价**：`tombstone + stripSignatureBlocks` 需重写 Session 中未闭合的 `tool_use`，否则降级模型的第二轮采样会因"悬垂 `tool_use` 缺 `tool_result`"而 PTL。
 
 #### Codex — `codex-model-provider/` 的三件套 + `responses_retry.rs`
@@ -689,10 +689,10 @@ fn backoff(attempt: u32, retry_after: Option<Duration>) -> Duration {
 - **`feature.Feature` 注册表**：`chatgpt/collaboration-mode/lmstudio` 等开关以 `Feature` 枚举注册，`ToolSpec` 按 `Feature` 过滤，避免"未启用模型的工具泄露"。
 - **每 step 重建 `ToolRouter`**：`build_tool_router()` 在每 `StepContext` 起点重建，保证 `model_visible_specs` 与本次快照一致（I2：Prompt 与 ToolSpecs 同快照），代价是每 step 一次 `RwLock` 读。
 
-#### OpenCode — `packages/opencode/src/provider/provider.ts:100` 的 BundledSDK
+#### OpenCode — `packages/opencode/src/provider/provider.ts:101` 的 BundledSDK
 
 ```ts
-// packages/opencode/src/provider/provider.ts:100 骨架
+// packages/opencode/src/provider/provider.ts:101 骨架
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createGoogle } from '@ai-sdk/google';
@@ -744,7 +744,7 @@ function googleVertexAnthropicBaseURL(region: string): string {
 **精读点**：
 
 - **10+ provider 即插即用**：`BundledSDK` 的 `switch(provider)` 覆盖 `@ai-sdk/*` 全生态，新增 Provider 仅需加一 `case`，工具、上下文、重试均无需改动——这是"AI SDK 薄抽象"的最大收益：**Provider 厚度仅一层 `switch`**。
-- **动态 `import()`**：`@opencode-ai/plugin` 对 `@ai-sdk/*` 的引入为 `await import('@ai-sdk/anthropic')` 动态式，避免 10+ Provider 的静态依赖膨胀，冷启动仅加载命中 Provider。
+- **动态 `import()`**：`@opencode-ai/plugin` 对 `@ai-sdk/*` 的引入为 `await import('@ai-sdk/anthropic')` 动态式，避免 21 Provider 的静态依赖膨胀，冷启动仅加载命中 Provider。
 - **`wrapSSE` 的双超时**：`headerTimeout` 防"连接假死"（TCP 已建连但服务端未发 header），`SSE read timeout` 防"流中假死"（header 已到但后续 chunk 停滞），两者缺一不可（见 8.4.2）。
 - **`googleVertexAnthropicBaseURL()`**：Vertex 的 Anthropic 兼容端点需按 `region` 拼 `baseURL`，是"多 region 适配"的最小实现（见 8.4.4）。
 
@@ -1222,7 +1222,7 @@ Pareto 前沿：
 > **本章关键词覆盖校验（供检索）**：
 > - 历史锚点：OpenAI Function Calling 2023-06 → Tool Use 标准化；LangChain 2022 BaseChatModel；AI SDK 2023 Vercel LanguageModelV3；LiteLLM 2023 字符串路由；Anthropic Messages API 2024-05 cache_control；Responses API 2024-09；reasoning_effort 2024-12；Grok 六端点 2025。
 > - 原理五层：Provider → Adapter（SSE/Responses/Chunks 归一 StreamChunk/BlockAssembler）→ PreparedLlmCall（adapterDefaults 剥除 waterfall）→ Retry/Attribution（normalizeLlmFailure, 401 truncate_to_prefix）→ 计费分离 live vs cumulative。
-> - 对证锚点：Claude claude.ts:queryModelWithStreaming + Bedrock/Vertex 分支；Codex model-provider/models-manager/login + responses_retry.rs；OpenCode provider.ts:100 BundledSDK 10+ provider + wrapSSE；Pi pi-ai 包 + getApiKey；DeepSeek llm/* PreparedLlmCall + llm-retry + assembler.ts；Grok sampler lib.rs SamplingClient 六端点 + xai-grok-auth SENT_BEARER_PREFIX_LEN=12；Claw OpenAICompat 双实现。对比表+分层图+StreamChunk 状态机+剥除时序+重试退避公式。
+> - 对证锚点：Claude claude.ts:queryModelWithStreaming + Bedrock/Vertex 分支；Codex model-provider/models-manager/login + responses_retry.rs；OpenCode provider.ts:101 BundledSDK 21 provider + wrapSSE；Pi pi-ai 包 + getApiKey；DeepSeek llm/* PreparedLlmCall + llm-retry + assembler.ts；Grok sampler lib.rs SamplingClient 六端点 + xai-grok-auth SENT_BEARER_PREFIX_LEN=12；Claw OpenAICompat 双实现。对比表+分层图+StreamChunk 状态机+剥除时序+重试退避公式。
 > - 权衡四组：单SDK直连 vs AI SDK统一 vs 适配器剥除；SSE 双超时 headerTimeout vs read timeout；401 归因 truncate_to_prefix；多 region 拼装 vs 网关。
 > - 未来五向：Model Router 智能选型、Reasoning-vs-Cost Pareto、结构化输出 json_schema 演进、Provider Federation 联邦、本地/云端混合。
 

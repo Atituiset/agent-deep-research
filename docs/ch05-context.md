@@ -180,7 +180,7 @@ chars/4 均值：   450 tok/msg
 | DeepSeek | `dsh-token-meter` + `dsh-context prepareCall(contextWindow)` | **~170K**（`contextWindow` 提示驱动） | 插件化 | `prepareCall` 带窗口提示 |
 | Pi | `transformContext(messages, signal) → AgentMessage[]`（用户注入） | **无内置阈值** | 无 | 用户在 `shouldStopAfterTurn` 中自定 |
 | OpenCode | `compaction` 隐藏 agent + `Truncate.wrap()` | **~180K**（`MessageV2.page` 分页时检查） | Drizzle 分页 | 分页投影时触发 |
-| Claw | `compact_after_turns=12` (`src/query_engine.py:193`) | **约 100—140K**（取决于 avg tokens/turn） | 固定轮数 | 原型级，不精确 |
+| Claw | `compact_after_turns=12` (`src/query_engine.py:19`) | **约 100—140K**（取决于 avg tokens/turn） | 固定轮数 | 原型级，不精确 |
 
 > 公式统一：**`T = W × p`  与  `T = W - R - B` 本质一致**，前者是后者的无量纲化（`p = 1 - (R+B)/W`）。Grok 的 `85%` 对应 `(R+B)=30K`，Claude 的 `W-13K`（+隐含 R=8K）对应 `p≈89.5%`，差异仅在对"压缩成本"的悲观程度。
 
@@ -338,14 +338,14 @@ cache_control: { type: "ephemeral", ttl: "5m" | "1h" }
 断点（breakpoint）= 两个相邻 cache_control 标记之间的边界
 ```
 
-- **Claude**（`src/services/api/claude.ts:606 getCacheControl({querySource})`）：System / Tools / History 三断点；Tools 按 `localeCompare` 分区排序，built-ins 前缀连续，保证断点稳定；
+- **Claude**（`src/services/api/claude.ts:361 getCacheControl({querySource})`）：System / Tools / History 三断点；Tools 按 `localeCompare` 分区排序，built-ins 前缀连续，保证断点稳定；
 - **Codex**：`store:false` 全量重发 + server cache，`ToolSpec` 分区 + `BaseInstructions` 缓存；
 - **DeepSeek**：`joinContextSections/renderContextSections` 控制可缓存前缀，`requestHeader()/requestContext()` 去重；
 - **Grok**：`forkSubagent` 时 `renderedSystemPrompt` 冻结，保证子 agent 缓存命中。
 
 #### 2) 断点不稳定的代价
 
-Claude 的教训（`src/main.tsx:385` + `src/services/compact/compact.ts` 的 `tengu_*` 事件）：
+Claude 的教训（`src/main.tsx:388 startDeferredPrefetches` + `src/services/compact/compact.ts` 的 `tengu_*` 事件）：
 
 | 抖动源 | 现象 | 命中率 |
 |--------|------|--------|
@@ -386,9 +386,9 @@ Claude 的教训（`src/main.tsx:385` + `src/services/compact/compact.ts` 的 `t
 | **Grok** | `crates/codegen/xai-grok-agent/src/compaction.rs:9%` + `xai-chat-state/src/actor/state.rs:estimate_item_tokens()` | `T = W × 85%`，`wall_clock_budget_secs=300` 额外限时 | `should_auto_compact(total, window)` 委托 `xai_token_estimation::exceeds_threshold` | 百分比阈值（多模型共享）+ `two_pass` 预计算 |
 | **Codex** | `codex-rs/core/src/compact.rs` + `core/src/context_manager/history.rs:93` + `core/src/context_manager/normalize.rs` | `T ≈ W × 90%`（动态，`history_version` 递增时检查） | `run_inline_auto_compact_task` + `for_prompt(self)` 归一化时 | 版本化 + 投影归一化（剥除不支持模态） |
 | **DeepSeek** | `packages/compaction/compaction-basic` + `compaction-tool-result-pruner` + `dsh-token-meter` | `T = contextWindow × 85%`（`prepareCall()` 提示） | `RuntimeContextProjection.project()` → `ContextSections` | 插件化：摘要与剪枝为独立 Cordis 插件 |
-| **Pi** | `packages/agent/src/types.ts:transformContext` + `docs/book/12-memory-projection.md` + 示例 `pruneOldMessages` | **无内置阈值**，用户注入 `estimateTokens` 与 `transformContext` | `AgentLoopConfig.shouldStopAfterTurn` / `getFollowUpMessages` | 最简：0 层压缩，用户完全控制 |
+| **Pi** | `packages/agent/src/types.ts:transformContext` + `docs/book/src/12-memory-projection.md` + 示例 `pruneOldMessages` | **无内置阈值**，用户注入 `estimateTokens` 与 `transformContext` | `AgentLoopConfig.shouldStopAfterTurn` / `getFollowUpMessages` | 最简：0 层压缩，用户完全控制 |
 | **OpenCode** | `packages/opencode/src/agent/agent.ts:35` + `tool/truncate.ts:Truncate.wrap()` + `agent/prompt/compaction.txt` | `T ≈ W × 90%`（`MessageV2.page` 分页时） | `compaction` 隐藏 agent（`mode:hidden`, `permission:* deny`） | 隐藏子 agent 隔离摘要，不触文件 |
-| **Claw** | `src/query_engine.py:193` + `rust/crates/runtime/src/compact.rs` | `T = compact_after_turns=12`（固定轮数） | `should_compact` 轮数检查 | 原型级，已验证"轮数不可靠" |
+| **Claw** | `src/query_engine.py:36 QueryEnginePort`（阈值 :19）+ `rust/crates/runtime/src/compact.rs` | `T = compact_after_turns=12`（固定轮数） | `should_compact` 轮数检查 | 原型级，已验证"轮数不可靠" |
 
 **归一公式**：
 
@@ -609,7 +609,7 @@ function getThreshold(W: number): number {
 
 ### 5.4.3 投影 vs 重写
 
-Pi 在 `docs/book/12-memory-projection.md` 的术语最清晰：
+Pi 在 `docs/book/src/12-memory-projection.md` 的术语最清晰：
 
 ```
 Session：全量事实（AgentMessage[]，持久化，永不丢失）
@@ -800,13 +800,13 @@ RadixAttention（SGLang, 前缀树）：
 query.ts:396  // "Apply snip before microcompact (both may run — they are not mutually exclusive)"
 query.ts:403    snipModule.snipCompactIfNeeded(...)          ← 第1层 粗删
 query.ts:412-426 microcompact（cached MC 按 tool_use_id 操作） ← 第2层 细删
-query.ts:440    contextCollapse.applyCollapsesIfNeeded(...)   ← 第3层 折叠
+query.ts:441    contextCollapse.applyCollapsesIfNeeded(...)   ← 第3层 折叠
                  ⚠ 受 feature flag CONTEXT_COLLAPSE 门控（query.ts:18-19），默认关闭
 之后            autocompactIfNeeded → compactConversation     ← 第4层 摘要
 ```
 
 两点对正文的重要修正/补充：
-1. **collapse 是实验特性**：需 `CONTEXT_COLLAPSE` feature 开启才生效（`query.ts:440`），生产路径默认只有三层 + autocompact；
+1. **collapse 是实验特性**：需 `CONTEXT_COLLAPSE` feature 开启才生效（`query.ts:441`），生产路径默认只有三层 + autocompact；
 2. **snip 与 micro 非互斥**：源码注释明确两者可同轮先后执行（396 行注释），并非"命中一层即停"。
 
 其他实证：`isConcurrencySafe` 默认 false 见 `Tool.ts:750`（注释原文 "assume not safe"）；`AUTOCOMPACT_BUFFER_TOKENS = 13_000` 见 `autoCompact.ts:62`；Grok 启动自愈调用点见 `xai-chat-state/src/actor/state.rs:211,219`。

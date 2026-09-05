@@ -1,6 +1,6 @@
 # 第7章 Session / Trace / 持久化
 
-> Session 解决“记住”、Trace 解决“说清”、持久化解决“不丢”。七家的共识是：**可重放（replay）优于可恢复（restore），追加（append）优于覆盖，可观测必须内建**。—— 本章把 Session 从“一个 Vec<Message>”还原为“一条 WAL”，把 Trace 从“打日志”还原为“分布式追踪”，逐行对证七家如何让 `--resume` 可信、让 `fork` 可分支、让崩溃不带毒。
+> Session 解决“记住”、Trace 解决“说清”、持久化解决“不丢”。七家的共识是：**可重放（replay）优于可恢复（restore），追加（append）优于覆盖，可观测必须内建**。—— 本章把 Session 从“一个 `Vec<Message>`”还原为“一条 WAL”，把 Trace 从“打日志”还原为“分布式追踪”，逐行对证七家如何让 `--resume` 可信、让 `fork` 可分支、让崩溃不带毒。
 
 ## 本章图谱
 

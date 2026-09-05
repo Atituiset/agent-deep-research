@@ -7,24 +7,24 @@
 | 锚点 | 说明 |
 |------|------|
 | `src/query.ts:219 query()` | turn 外层循环，四层压缩触发点 |
-| `src/QueryEngine.ts:184 QueryEngine` | SDK/headless 封装，`submitMessage()` + `recordTranscript` 预写 |
-| `src/Tool.ts:362 Tool` | 工具类型与 `buildTool()` 默认 `isConcurrencySafe=false` |
-| `src/tools.ts:194 getAllBaseTools()` | 30+ 工具注册，`assembleToolPool()` 分区排序 |
-| `src/context.ts:116 getSystemContext()/getUserContext()` | System/User 上下文，`memoize` 缓存 |
+| `src/QueryEngine.ts:184 QueryEngine` | SDK/headless 封装，`submitMessage()` + 预写 transcript |
+| `src/Tool.ts:362 Tool` | 工具类型；`buildTool()(:783)` 默认 `isConcurrencySafe=false`（`TOOL_DEFAULTS` :758） |
+| `src/tools.ts:194 getAllBaseTools()` | 60+ 工具注册，`assembleToolPool()(:346)` 分区排序 |
+| `src/context.ts:116 getSystemContext()`（`getUserContext()` :155） | System/User 上下文，`memoize` 缓存 |
 | `src/utils/tokens.ts` / `src/services/tokenEstimation.ts` | `chars/4` 估算 |
-| `src/services/compact/autoCompact.ts:62` | `AUTOCOMPACT_BUFFER=13K`, `MAX_OUTPUT_TOKENS_FOR_SUMMARY=20K` |
-| `src/services/compact/compact.ts:387 compactConversation()` | 摘要执行：`PreCompact → streamCompactSummary → boundary` |
-| `src/utils/sessionStorage.ts` | `getTranscriptPath() → ~/.claude/projects/<hash>/session.jsonl` |
-| `src/services/api/claude.ts:606 getCacheControl()` | `cache_control: ephemeral` |
-| `src/tools/AgentTool/` | 60+ 子 Agent 类型，`isolation:worktree\|remote` |
+| `src/services/compact/autoCompact.ts:62` | `AUTOCOMPACT_BUFFER_TOKENS=13_000`（:30 `MAX_OUTPUT_TOKENS_FOR_SUMMARY=20_000`，:66 `MAX_CONSECUTIVE_AUTOCOMPACT_FAILURES=3` 熔断） |
+| `src/services/compact/compact.ts:387 compactConversation()` | 摘要执行：`executePreCompactHooks(:413) → streamCompactSummary(:451) → boundary(:350)` |
+| `src/utils/sessionStorage.ts:202 getTranscriptPath()` | `~/.claude/projects/<projectDir>/<sessionId>.jsonl`（`getProjectDir()` 在 `sessionStoragePortable.ts`） |
+| `src/services/api/claude.ts:361 getCacheControl()` | `cache_control: ephemeral`（:606 为首个调用点） |
+| `src/tools/AgentTool/` | 内建子 Agent 仅 5–6 类（`general-purpose`/`Explore`/`Plan`/`statusline-setup`/`verification`/`claude-code-guide`），`constants.ts:13 ONE_SHOT_BUILTIN_AGENT_TYPES={Explore,Plan}`；用户 Agent 从 `.claude/agents/` frontmatter 加载（`loadAgentsDir.ts:126 isolation:worktree\|remote`，remote 为 ant-only） |
 
 ## Claw (`claw-code-main`)
 
 | 锚点 | 说明 |
 |------|------|
-| `src/query_engine.py:193 QueryEnginePort` | Python 镜像，`compact_after_turns=12` |
-| `src/tools.py:96 load_tool_snapshot()` | 工具快照加载 |
-| `rust/crates/runtime/src/conversation.rs:117 ConversationRuntime` | 真实 Rust 循环 |
+| `src/query_engine.py:36 QueryEnginePort`（`compact_after_turns=12` 在 :19） | Python 镜像，`max_turns=8`/`max_budget_tokens=2000` |
+| `src/query_engine.py:24 load_tool_snapshot()` | 工具快照加载（`PORTED_TOOLS`） |
+| `rust/crates/runtime/src/conversation.rs:91 ConversationRuntime` | 真实 Rust 循环 |
 | `rust/crates/runtime/src/session.rs` | `Session{version,messages}` |
 | `rust/crates/runtime/src/compact.rs` | `should_compact/format_compact_summary` |
 
@@ -33,22 +33,22 @@
 | 锚点 | 说明 |
 |------|------|
 | `codex-rs/core/src/session/turn.rs:153 run_turn()` | 三层嵌套主循环 |
-| `codex-rs/core/src/context_manager/history.rs:93 ContextManager` | `for_prompt()` 投影 |
-| `codex-rs/tools/src/tool_spec.rs:20 ToolSpec` | `ToolSpec{Function/Namespace/ToolSearch}` |
-| `codex-rs/tools/src/tool_executor.rs:106 ToolExecutor` | `spec()+handle()` 同源 |
+| `codex-rs/core/src/context_manager/history.rs:45 ContextManager`（`for_prompt()` 在 :206） | `for_prompt()` 投影 |
+| `codex-rs/tools/src/tool_spec.rs:22 ToolSpec` | `ToolSpec{Function/Namespace/ToolSearch}` |
+| `codex-rs/tools/src/tool_executor.rs:106 ToolExecutor` | trait：`spec()(:110)+handle()(:126)` 同源 |
 | `codex-rs/core/src/tools/spec_plan.rs:117 build_tool_router()` | 每 StepContext 重建 |
-| `codex-rs/config/src/config_toml.rs:152 ConfigToml` | 两级配置模型 |
-| `codex-rs/cli/src/main.rs:100 MultitoolCli` | 入口分发 |
-| `book/src/ch07-agent-loop.md` | 逐函数走读 |
+| `codex-rs/config/src/config_toml.rs:155 ConfigToml` | 两级配置模型 |
+| `codex-rs/cli/src/main.rs:115 MultitoolCli` | 入口分发 |
+| `book/docs/ch07-agent-loop.md` | 逐函数走读 |
 
 ## OpenCode (`opencode`)
 
 | 锚点 | 说明 |
 |------|------|
-| `packages/opencode/src/session/session.ts:224 Info Schema` | Effect Session，`create/fork/touch/list` |
+| `packages/opencode/src/session/session.ts:224 Info Schema` | Effect Session，`create(:669)/fork(:693)/touch(:751)` |
 | `packages/opencode/src/tool/tool.ts:55 Def` | `Tool.Def{parameters,execute:Effect}` |
-| `packages/opencode/src/agent/agent.ts:35 Info` | `build/plan/general/explore/compaction` 6 类原生 agent |
-| `packages/opencode/src/provider/provider.ts:100` | `BundledSDK` 10+ provider |
+| `packages/opencode/src/agent/agent.ts:35 Info` | 原生 agent：`build/plan/general/explore/compaction` + 隐藏的 `title/summary`（均 primary/subagent 双 mode） |
+| `packages/opencode/src/provider/provider.ts:101 BundledSDK` | `BUNDLED_PROVIDERS(:107)` 21 个 `@ai-sdk/*` provider 动态 import |
 | `packages/opencode/src/tool/truncate.ts` | `Truncate.wrap()` 统一截断 |
 | `tool/truncate.ts` + `agent/prompt/compaction.txt` | 隐藏 compaction agent |
 
@@ -57,8 +57,8 @@
 | 锚点 | 说明 |
 |------|------|
 | `packages/agent/src/types.ts:28 StreamFn` | `Model<Api> → Context → Stream` |
-| `packages/agent/src/agent-loop.ts:155 runLoop` | 200 行最小闭环 |
-| `packages/storage/src/` | `session-tree/session-storage/sqlite-backend` |
+| `packages/agent/src/agent-loop.ts:155 runLoop` | 最小闭环（792 行文件，共享 agentLoop/agentLoopContinue） |
+| `packages/agent/src/harness/session/`（`jsonl-repo/jsonl-storage/memory-repo/memory-storage`）+ `packages/storage/sqlite-node` | 会话存储：JSONL 仓 + SQLite 后端（`@earendil-works/pi-storage-sqlite-node`） |
 | `docs/book/src/12-memory-projection.md` | 投影术语 |
 | `docs/book/src/23-subagents.md` | 子 Agent |
 
@@ -66,22 +66,22 @@
 
 | 锚点 | 说明 |
 |------|------|
-| `packages/core/agent-loop/src/agent.ts:64 ReactLoopAgent` | `Phase{idle\|maintenance\|running}` 状态机 |
+| `packages/core/agent-loop/src/agent.ts:70 ReactLoopAgent`（`type Phase` :39） | `Phase{idle\|maintenance\|running}` 状态机 |
 | `packages/core/agent/src/inbox.ts Inbox` | `splice(next-turn vs next-step)` 精确打断 |
 | `packages/llm/llm/src/assembler.ts BlockAssembler` | `chunk → block-start/delta/block-end` |
 | `packages/llm/llm/src/adapter-failure.ts` | `normalizeLlmFailure()` 归一 |
-| `packages/session/session-persistence/src/` | `jsonl/sqlite` 双后端 |
+| `packages/session/session-persistence/src/`（`storage-contract.ts`）+ `session-persistence-jsonl/` | 持久化契约 + JSONL 后端（zstd 压缩）；SQLite 由 `packages/storage/sqlite-node` 承担 |
 
 ## Grok Build (`grok-build`)
 
 | 锚点 | 说明 |
 |------|------|
-| `crates/codegen/xai-chat-state/src/actor/state.rs:1 ChatState` | `conversation + UsageLedger + turn_capture` |
-| `crates/codegen/xai-chat-state/src/actor/mod.rs ChatStateActor` | 单 task 拥有状态，`Command + Oneshot` |
-| `crates/codegen/xai-grok-sampler/src/lib.rs SamplingClient` | 三后端×六端点，`GrokRequestHeaders` |
+| `crates/codegen/xai-chat-state/src/actor/state.rs` ChatState（:119 `conversation`，:163 `turn_capture`） | `conversation + UsageLedger + turn_capture` |
+| `crates/codegen/xai-chat-state/src/actor/mod.rs:30 ChatStateActor` | 单 tokio task 拥有状态（`ChatStateCommand` + mpsc），`handle.rs` Oneshot 回执 |
+| `crates/codegen/xai-grok-sampler/src/client.rs` SamplingClient（:34 `ApiBackend` 三后端：`ChatCompletions/Responses/Messages`；:45 `GrokRequestHeaders`） | 三 API 后端，`lib.rs:9` 为 Layer 1 入口 |
 | `crates/codegen/xai-grok-tools/src/bridge.rs ToolBridge` | `ToolRegistry + ToolKind + TemplateRenderer` |
-| `crates/codegen/xai-grok-agent/src/compaction.rs CompactionPolicy` | `auto_compact_threshold_percent:85` |
-| `crates/codegen/xai-grok-agent/src/agent.rs AgentBuilder` | 30+ 流式配置 |
+| `crates/codegen/xai-grok-agent/src/compaction.rs:9 CompactionPolicy`（Default :39） | `auto_compact_threshold_percent:85` |
+| `crates/codegen/xai-grok-agent/src/builder.rs:42 AgentBuilder` | 51 个 `with_*` 流式配置方法 |
 | `crates/codegen/xai-fast-worktree` | `btrfs/overlay` 快速分支 |
 
 ## 理论卷（`src/theory/`，原 agent-infra-research，2026-08 并入）
@@ -112,7 +112,7 @@
 | `qwen_agent/agents/fncall_agent.py:73 _run()` | 主循环：`while num_llm_calls_available > 0` 计数器式 hop 上限（MAX_LLM_CALL_PER_RUN=20, settings.py:24）|
 | `qwen_agent/memory/memory.py:32 Memory(Agent)` | **Memory 即 Agent**：RAG 式记忆（retrieval+doc_parser+keygen_strategies，max_ref_token=4000）|
 | `qwen_agent/multi_agent_hub.py:22 MultiAgentHub` | 多 Agent 组合器（_agents 列表）；agents/router.py 路由、group_chat.py 群聊 |
-| `qwen_agent/llm/base.py:61 BaseChatModel` | 模型注册表工厂 get_chat_model；`llm/function_calling.py` + `fncall_prompts/` 文本协议模拟 FC（非原生 FC 模型可用）|
+| `qwen_agent/llm/base.py:61 BaseChatModel` | 模型注册表工厂 get_chat_model；`llm/function_calling.py` + `llm/fncall_prompts/` 文本协议模拟 FC（非原生 FC 模型可用）|
 | `qwen_agent/tools/base.py:24 TOOL_REGISTRY` | 全局工具注册表 + register_tool 装饰器；MCPManager 支持 mcpServers |
 | `qwen_agent/utils/tokenization_qwen.py` | 真 tiktoken 计数（qwen.tiktoken），八家中唯一非 chars/4 |
 
@@ -124,13 +124,15 @@
 | 锚点 | 说明 |
 |------|------|
 | `agent/conversation_loop.py:1766 run_conversation()` | 主循环入口：工具调用直到完成；流式回调供 TTS 提前合成 |
-| `run_agent.py`（9215 行） | 单体式 Agent 核心（与 Codex 的 Bazel 多 crate 成两极） |
+| `run_agent.py`（9207 行） | 单体式 Agent 核心（与 Codex 的 Bazel 多 crate 成两极） |
 | `agent/context_engine.py:89 class ContextEngine(ABC)` | **可插拔上下文引擎**：`:146 should_compress()` 抽象——九家中唯一把压缩策略做成运行时可替换 |
 | `agent/conversation_compression.py:469 CompressionCommitFence` | 压缩提交栅栏：解决"压缩落盘与并发写历史"的竞态（独特工程件） |
-| `tools/terminal_tool.py:1517 _CONTAINER_BACKENDS={docker,singularity,modal,daytona,vercel_sandbox}` | **七种终端后端**（+local/ssh）：执行环境即插件，serverless 休眠唤醒 |
+| `tools/terminal_tool.py:1517 _CONTAINER_BACKENDS` | `frozenset{docker,singularity,modal,daytona,vercel_sandbox}`（+local/ssh 共七种终端后端） |
 | `tools/skill_manager_tool.py:908 _create_skill()` | 自改进闭环：任务完成后自主创建技能，使用中自我改进（Voyager 谱系产品化） |
 | `agent/memory_manager.py` + `memory_provider.py` | Agent 自策展记忆 + 周期性 nudge；`StreamingContextScrubber`(:182) 流式脱敏 |
 | `trajectory_compressor.py`（1598 行） | 轨迹压缩生成训练数据——"research-ready"定位的独有件 |
 | 多 Provider 适配 | `agent/{anthropic,bedrock,codex_responses}_adapter.py`；网关单进程接 Telegram/Discord/Slack 等 |
 
 > 对照价值：①把 Ch6 记忆三范式补齐为四范式（compaction / RAG / Zettelkasten / **自策展+跨会话 FTS5**）；②把 Ch11 执行隔离从"沙箱选型"扩展为"环境即后端"；③Ch5 的"投影策略"被它形式化为 ContextEngine ABC。
+>
+> 快照漂移注记（2026-09-05 核验）：上游 `upstream/main` 合入后 `run_agent.py` 由 9207 行瘦身至 1555 行、`trajectory_compressor.py` 1598→868 行；`conversation_loop.py:1766`、`context_engine.py:89/146`、`conversation_compression.py:469`、`terminal_tool.py:1517` 等其余锚点仍准确。上表行数为 2026-08-22 快照值。

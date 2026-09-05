@@ -15,7 +15,7 @@
 |------|------|---------|---------|
 | claude-code-haha | `/home/atituiset/Projects/claude-code-haha` | `999.0.0-local`, `src/query.ts` 1729 行 | `bin/claude-haha → src/main.tsx:585 main()` |
 | claw-code-main | `/home/atituiset/Projects/claw-code-main` | Python 快照 + `rust/crates/*` 9 crates | `src/main.py:213` + `rust/crates/claw-cli/src/main.rs` |
-| codex | `/home/atituiset/Projects/codex` | `codex-rs/` 30+ crate + `book/src/` 17 章 | `codex-rs/cli/src/main.rs:100 MultitoolCli` |
+| codex | `/home/atituiset/Projects/codex` | `codex-rs/` 30+ crate + `book/docs/` 走读文档 | `codex-rs/cli/src/main.rs:115 MultitoolCli` |
 | opencode | `/home/atituiset/Projects/opencode` | `packages/*` 24+ 包, `Effect 4.0-beta.83` | `packages/opencode/src/index.ts` |
 | pi | `/home/atituiset/Projects/pi` | `packages/{agent,ai,coding-agent,server,storage,tui}/` 5 包 | `packages/agent/src/agent-loop.ts:155 runLoop` |
 | deepseek-harness | `/home/atituiset/Projects/deepseek-harness` | `packages/*` 60+ 包, `Cordis` | `apps/cli/src/bin.ts` + `preset.yml` |
@@ -28,26 +28,26 @@
 # Claude
 src/query.ts:219 / src/QueryEngine.ts:184 / src/Tool.ts:362 / src/tools.ts:194
 src/context.ts:116 / src/utils/tokens.ts / src/services/compact/autoCompact.ts:62
-src/utils/sessionStorage.ts / src/services/api/claude.ts:606
+src/utils/sessionStorage.ts:202 getTranscriptPath / src/services/api/claude.ts:361 getCacheControl
 
 # Codex
 codex-rs/core/src/session/turn.rs:153 / core/src/tools/spec_plan.rs:117
-codex-rs/config/src/config_toml.rs:152 / core/src/context_manager/history.rs:93
-codex-cli/bin/codex.js:16 / codex-rs/cli/src/main.rs:100
+codex-rs/config/src/config_toml.rs:155 ConfigToml / core/src/context_manager/history.rs:45 ContextManager
+codex-cli/bin/codex.js:16 / codex-rs/cli/src/main.rs:115 MultitoolCli
 
 # OpenCode
-packages/opencode/src/session/session.ts:102 / tool/tool.ts:50
-packages/opencode/src/agent/agent.ts:35 / provider/provider.ts:1
+packages/opencode/src/session/session.ts:224 Info / tool/tool.ts:55 Def
+packages/opencode/src/agent/agent.ts:35 Info / provider/provider.ts:101 BundledSDK
 
 # Pi
-packages/agent/src/types.ts:26 / agent.ts:runLoop / docs/book/src/12-memory-projection.md
+packages/agent/src/types.ts:28 StreamFn / agent-loop.ts:155 runLoop / docs/book/src/12-memory-projection.md
 
 # DeepSeek
-packages/core/agent-loop/src/agent.ts:64 / core/agent/src/inbox.ts
+packages/core/agent-loop/src/agent.ts:70 ReactLoopAgent / core/agent/src/inbox.ts Inbox
 packages/llm/llm/src/assembler.ts / session/session-persistence/src/
 
 # Grok
-crates/codegen/xai-chat-state/src/actor/state.rs:1 / xai-grok-agent/src/agent.rs:1
+crates/codegen/xai-chat-state/src/actor/state.rs ChatState / xai-grok-agent/src/builder.rs:42 AgentBuilder
 crates/codegen/xai-grok-tools/src/bridge.rs:1 / xai-grok-sampler/src/
 ```
 
@@ -120,7 +120,7 @@ agent-deep-research/
 | Codex `spec_plan.rs:1381 build_tool_router` | **spec_plan.rs:117** | `pub(crate) fn build_tool_router(` |
 | Codex `codex-tools/src/tool_executor.rs:101` | **codex-rs/tools/src/tool_executor.rs:106** | trait ToolExecutor 定义处 |
 | Codex `history.rs:43 ContextManager` | **history.rs:93** | `impl ContextManager` |
-| DeepSeek `agent.ts:50 ReactLoopAgent` | **agent.ts:64**（Phase 类型在 :38） | class 声明处 |
+| DeepSeek `agent.ts:50 ReactLoopAgent` | **agent.ts:70**（Phase 类型在 :39） | class 声明处 |
 | Pi `agent.ts:runLoop` | **agent-loop.ts:155**（agent.ts:171 是 class Agent 包装） | 函数定义处 |
 | OpenCode `agent.ts:90 / tool.ts:30 / session.ts:102` | **agent.ts:35 Info / tool.ts:55 Def / session.ts:224 Info Schema** | export 声明处 |
 | Grok `compaction.rs:85` | **compaction.rs:9 struct CompactionPolicy**（threshold 字段 :12，注释示例 85%） | struct 定义处 |

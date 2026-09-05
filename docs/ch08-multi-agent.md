@@ -362,7 +362,7 @@ Pi / OpenCode fork         DeepSeek Cordis Scope          Claude worktree/remote
 #### Scope 隔离的精髓（DeepSeek Cordis）
 
 ```ts
-// DeepSeek: packages/core/agent-loop/src/agent.ts:64 + Cordis Scope
+// DeepSeek: packages/core/agent-loop/src/agent.ts:70 ReactLoopAgent + Cordis Scope
 import { Scope } from 'cordis';
 
 // 每个 Agent（含 subagent）拥有独立 Scope，Scope 退出时自动收回所有注册的服务
@@ -420,7 +420,7 @@ impl ChatStateActor {
 | 家 | 通信载体 | 粒度 | 方向 | 关键文件 |
 |----|----------|------|------|----------|
 | DeepSeek | `Inbox.splice(target)` + `Inbox.nextStep` | **最细**：`next-turn` vs `next-step` 区分 | 双向：主→子（`steer`）/ 子→主（`tool_result`） | `packages/core/agent/src/inbox.ts` |
-| Codex | `InterAgentCommunication` (enum 变体) + `InputQueue` | 中：`TurnInput{UserInput\|InterAgentCommunication}` | 双向：`Agent → Agent` 消息 | `codex-rs/core/src/session/input_queue.rs:19` |
+| Codex | `InterAgentCommunication` (enum 变体) + `InputQueue` | 中：`TurnInput{UserInput\|InterAgentCommunication}` | 双向：`Agent → Agent` 消息 | `codex-rs/core/src/session/input_queue.rs:21` |
 | Claude | `InterAgentCommunication` + `agentToolUtils.finalizeAgentTool/classifyHandoffIfNeeded` | 中：`agentToolUtils` 统一收敛 | 子→主为主，`spawnTeammate` 支持主→子 | `src/tools/AgentTool/` + `src/utils/teammate.ts` |
 | OpenCode | `EventV2Bridge` | 粗：事件总线广播 | 广播式 | `packages/opencode/src/tool/task.ts` |
 | Grok | `TurnInput contributors` + `SchedulerHandle` 树 | 中：`contributors` 列表 | 树状广播 | `xai-agent-lifecycle/local/{registry,contributors}` |
@@ -469,7 +469,7 @@ class Inbox {
 #### Codex InterAgentCommunication
 
 ```rust
-// Codex: codex-rs/core/src/session/input_queue.rs:19
+// Codex: codex-rs/core/src/session/input_queue.rs:21
 pub enum TurnInput {
     UserInput(UserInput),
     InterAgentCommunication(InterAgentCommunication),
@@ -511,7 +511,7 @@ pub struct InterAgentCommunication {
 #### DeepSeek Cordis waterfall 的全貌
 
 ```ts
-// DeepSeek: packages/core/agent-loop/src/agent.ts:64 附近
+// DeepSeek: packages/core/agent-loop/src/agent.ts:70 附近
 // waterfall 是 Cordis 事件总线的核心原语：事件依次经过每个插件，插件可改写或阻断
 import { waterfall } from 'cordis';
 
@@ -576,7 +576,7 @@ type AgentLoopConfig = {
 | 家 | 子 Agent 载体 | 隔离模型 | 发现机制 | 通信 | 规划容器 | 钩子 | 嵌套 |
 |----|--------------|---------|---------|------|---------|------|------|
 | **Claude** | `src/tools/AgentTool/` 60+ 类型 (`builtInAgents.ts`) + `LocalAgentTask{registerAsyncAgent/registerAgentForeground}` + `spawnTeammate()` | `isolation: worktree\|remote` (`createAgentWorktree()` 临时 worktree, `teleportToRemote()` CCR), `runWithAgentContext(parentSessionId)` | `~/.claude/agents/` + `AgentTool.effectiveType` 缺省 `fork`（cache-identical 前缀） | `InterAgentCommunication` + `agentToolUtils.finalizeAgentTool/classifyHandoffIfNeeded` | `TodoWriteTool` + `Task*Tool` + `AskUserQuestionTool` + `Plan(isInPlanMode())` → `.agent/plans/*.md` | `PreCompact/PostCompact/SessionStart/Stop` | 禁止嵌套 teammate (`isTeammate()/isInProcessTeammate()`) |
-| **Codex** | `codex-rs/agent/registry.rs/status.rs/control.rs/role.rs` + `tasks/regular.rs` vs `session/realtime_conversation.rs` | 无 worktree，`collaboration-mode-templates/` 模板隔离 | `AgentResolver` | `session/input_queue.rs:19 InterAgentCommunication` 变体 | `plugins/` + `hooks/hook_runtime.rs` + `ExtensionData` | `ExtensionData/TurnInputContext/TurnInputEnvironment` + `agent/pre-step` | 模板级隔离，无显式嵌套 |
+| **Codex** | `codex-rs/agent/registry.rs/status.rs/control.rs/role.rs` + `tasks/regular.rs` vs `session/realtime_conversation.rs` | 无 worktree，`collaboration-mode-templates/` 模板隔离 | `AgentResolver` | `session/input_queue.rs:21 InterAgentCommunication` 变体 | `plugins/` + `hooks/hook_runtime.rs` + `ExtensionData` | `ExtensionData/TurnInputContext/TurnInputEnvironment` + `agent/pre-step` | 模板级隔离，无显式嵌套 |
 | **Grok** | `xai-grok-agent/discovery.rs SubagentEntry{source}` + `xai-agent-lifecycle/local/{registry,contributors}` | `xai-grok-workspace SchedulerHandle` + `parent_scheduler_handle`, `xai-fast-worktree btrfs/overlay` | `AgentBuilder.parent_scheduler_handle` | `xai-agent-lifecycle` 的 `TurnInput contributors` | `xai-workflow` + `background_workflows_enabled` 闸控 `Workflow/GoalUpdate` 互斥 | `ReminderPolicy` + `PromptContext{audience:Primary\|Subagent}` | `SchedulerHandle` 树，1 层 |
 | **DeepSeek** | `dsh-subagent` + `dsh-tool-subagent/subagent-control` | `Cordis Scope.createScope(loopCtx, this)` 生命周期随 Agent 退出收回 | `preset.yml` 决定子 agent 组合 | `Inbox.splice(next-step)` | `dsh-goal/goal-round-driver` → `dsh-plan-mode` → `dsh-todo` → `dsh-workflow/worker-thread` → `dsh-jobs-local` 四级 | `waterfall('agent/turn-stopping'/'agent/pre-step'/'agent/request')` | Scope 树，禁止 teammate 嵌套 |
 | **OpenCode** | `packages/opencode/src/agent/agent.ts:35 Info{mode:subagent\|primary\|all}` + `tool/task.ts` | `Session.fork()` + `subagent-permissions.ts` 权限继承 | `skill` 发现 | `EventV2Bridge` | `tool/task.ts` + `task.txt` + `todo` + `plan_enter/plan_exit` 受限工具 | `EventV2Bridge` + `Agent.steps` | `Info.mode` 控制，1 层 |
@@ -670,7 +670,7 @@ export function spawnTeammate(teamName: string, name: string, task: string) {
 #### Codex — `codex-rs/agent/registry.rs` + `collaboration-mode` + `InterAgentCommunication`
 
 ```rust
-// 骨架（Rust 伪代码，对应 codex-rs/agent/ + session/input_queue.rs:19）
+// 骨架（Rust 伪代码，对应 codex-rs/agent/ + session/input_queue.rs:21）
 // 1. Agent 注册表
 // codex-rs/agent/registry.rs
 pub struct AgentRegistry {
@@ -692,7 +692,7 @@ pub enum CollaborationMode {
 }
 
 // 3. 通信：InterAgentCommunication 作为 TurnInput 变体
-// codex-rs/core/src/session/input_queue.rs:19
+// codex-rs/core/src/session/input_queue.rs:21
 pub enum TurnInput {
     UserInput(UserInput),
     InterAgentCommunication(InterAgentCommunication),
@@ -957,7 +957,7 @@ export const agentTool = buildTool({
 | 子 Agent | 占位，无 `AgentTool` | 规划对标 Claude `AgentTool`，Rust 实现 |
 | 隔离 | 无 | 规划 `worktree` 隔离（参考 Grok `xai-fast-worktree`） |
 | 规划 | `compact_after_turns=12` 固定轮数 | 规划 `TodoWrite` 对等 |
-| 价值 | 作为"TS→Rust 移植"的桥梁案例，见 `src/tools.py:96 load_tool_snapshot()` | 观察其如何把 Claude 的 TS 思想翻译为 Rust |
+| 价值 | 作为"TS→Rust 移植"的桥梁案例，见 `src/tools.py:24 load_tool_snapshot()` | 观察其如何把 Claude 的 TS 思想翻译为 Rust |
 
 > **Claw 的反例价值**：`compact_after_turns=12` 的固定轮数触发 vs Claude `effectiveWindow-13K` / Grok `85%` 的 token 预算驱动，是"原型 vs 生产"的典型差距——固定轮数在长工具结果场景 12 轮前已 PTL，在短轮场景又过早压缩。
 
@@ -1240,7 +1240,7 @@ LangGraph 的 StateGraph 是雏形，DeepSeek 的 dsh-workflow/worker-thread 是
 | 家 | Workflow 能力 | DSL 形态 |
 |----|--------------|----------|
 | DeepSeek | `dsh-workflow/worker-thread` + `dsh-jobs-local` 最完整 | Cordis 插件组合，无显式 DSL |
-| Grok | `xai-workflow` + `TemplateRenderer` | `${{ tools.by_kind.* }}` 模板 |
+| Grok | `xai-workflow` + `TemplateRenderer` | 模板语法原文：`$`<code v-pre>{{ tools.by_kind.* }}</code> |
 | LangGraph | `StateGraph{ nodes, edges, checkpoint }` | TS/Python 代码即 DSL |
 | Claude | `TodoWrite` 线性，无 DAG | 无 |
 | 未来 | Workflow DSL 文件（`.agent/workflows/*.yaml`） | 声明式，支持 `parallel/sequential/conditional` |
@@ -1503,7 +1503,7 @@ npm run dev -- --print "让 subagent 再派生 subagent"
 > | Claude | `agentToolUtils.finalizeAgentTool/classifyHandoffIfNeeded` | 子 Agent 结果收敛与 handoff 判定 |
 > | Codex | `codex-rs/agent/registry.rs/status.rs/control.rs/role.rs` | Agent 注册与角色 |
 > | Codex | `collaboration-mode-templates/` | 模板级隔离 |
-> | Codex | `codex-rs/core/src/session/input_queue.rs:19` | `TurnInput{UserInput\|InterAgentCommunication}` |
+> | Codex | `codex-rs/core/src/session/input_queue.rs:21` | `TurnInput{UserInput\|InterAgentCommunication}` |
 > | Grok | `xai-grok-agent/discovery.rs SubagentEntry{source}` | 子 Agent 发现 |
 > | Grok | `xai-fast-worktree btrfs/overlay` | COW 快速分支 |
 > | Grok | `xai-grok-workspace SchedulerHandle` | `parent_scheduler_handle` 树 |
@@ -1514,7 +1514,7 @@ npm run dev -- --print "让 subagent 再派生 subagent"
 > | DeepSeek | `packages/core/agent/src/inbox.ts Inbox` | `splice(next-turn/next-step)` 精确通信 |
 > | OpenCode | `packages/opencode/src/agent/agent.ts:35 Info{mode}` | `mode:subagent\|primary\|all` 可见性 |
 > | OpenCode | `packages/opencode/src/tool/task.ts` + `task.txt` | 任务规划与子 Agent 派生 |
-> | OpenCode | `packages/opencode/src/session/session.ts:102 Session.fork()` | 会话血缘 |
+> | OpenCode | `packages/opencode/src/session/session.ts:693 Session.fork()`（接口 :427） | 会话血缘 |
 > | OpenCode | `subagent-permissions.ts` + `EventV2Bridge` | 权限继承与事件通信 |
 > | Pi | `docs/book/23-subagents.md AgentTool{subagent_type}` | 同进程协程子 Agent |
 > | Pi | `packages/agent/src/types.ts AgentLoopConfig` | `beforeToolCall/afterToolCall` 钩子 |

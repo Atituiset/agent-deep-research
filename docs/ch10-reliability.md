@@ -142,7 +142,7 @@ Grok `xai-grok-auth` 规定 `SENT_BEARER_PREFIX_LEN=12`：任何日志/回调/�
 | OpenCode | `PermissionV1.Ruleset` 三源合并 + 细粒度键（question/plan_enter/.env） | 依赖宿主/扩展 | Truncate 兜底 + EventV2Bridge 状态可查 | permission 变更入 SessionTable |
 | Pi | `beforeToolCall` 钩子可 block/改写（signal 感知） | `pi-extension-sandbox` 可选装 | shouldStopAfterTurn 熔断 + terminate 需 batch 全员置位（防单工具误终止全局） | AgentEvent 流可供外部审计 |
 | Hermes | 审批工具化（`tools/approval.py`）；流式输出经 `StreamingContextScrubber`(memory_manager.py:182) 边流边脱敏 | **环境即后端**：`terminal_tool.py:1517` 七种执行后端（local/ssh/docker/singularity/modal/daytona/vercel_sandbox），隔离粒度从进程级升到"整个运行环境可休眠可重建" | 异常转消息回填（同 Qwen-Agent 软自愈）+ CompressionCommitFence 防压缩竞态 | 密钥走 credential_pool/persistence |
-| Claw | `permission_policy.authorize` 在 run_turn 内联（Allow→execute / Deny→is_error:true）（`conversation.rs:117`） | 无 | 无自愈（原型级） | 无 |
+| Claw | `permission_policy.authorize` 在 run_turn 内联（Allow→execute / Deny→is_error:true）（`conversation.rs:153 run_turn()`） | 无 | 无自愈（原型级） | 无 |
 | Qwen-Agent | **无权限层、无沙箱**：`_call_tool` 直接执行（`agent.py:178`），异常捕获转字符串返回 | 无（code_interpreter 依赖宿主环境隔离） | 异常转 error_message 字符串喂回模型（"软自愈"：模型看到 traceback 自己改参数重试） | logger.warning 即全部 |
 
 ### 11.3.2 Qwen-Agent 对照：信任边界的两种哲学
@@ -198,7 +198,7 @@ Codex 用 `arg0` crate 让同一个二进制以 `codex-linux-sandbox` 名字运�
 
 ### 11.4.3 三条铁律
 
-1. **权限只在编排器一处判**（横切面），规则合并顺序固定（defaults<project<user<flag）；
+1. **权限只在编排器一处判**（横切面），规则合并顺序固定（`defaults < project < user < flag`）；
 2. **先归一再处置**：没有 `normalizeLlmFailure` 就没有统一的 DISPOSITION 表，重试逻辑必然散落腐化；
 3. **自愈放启动时**：热路径只做检测不做修复，修复成本一次性付清（Grok 模式）。
 

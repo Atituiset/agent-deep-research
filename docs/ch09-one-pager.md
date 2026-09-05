@@ -72,7 +72,7 @@ Agent Infra 一页纸（八家源码对照版，2026-08）
 | 追问 | 答案要点 | 锚点 |
 |------|---------|------|
 | 为什么不用 tiktoken？ | chars/4 零依赖够预算控制（阈值留 buffer）；Qwen-Agent 反例证明大厂也分两派 | `claude-code-haha/src/utils/tokens.ts` vs `Qwen-Agent/qwen_agent/utils/tokenization_qwen.py` |
-| 缓存命中率怎么保？ | 工具 localeCompare 排序 + prompt 冻结 + contentHash 替代随机 UUID；关前缀缓存实测 98% miss | `claude-code-haha/src/services/api/claude.ts:606` |
+| 缓存命中率怎么保？ | 工具 localeCompare 排序 + prompt 冻结 + contentHash 替代随机 UUID；关前缀缓存实测 98% miss | `claude-code-haha/src/services/api/claude.ts:361` |
 | 工具何时能并行？ | isReadOnly && isConcurrencySafe 才并行，preflight 仍串行；Pi 要求 terminate 全员置位 | `claude-code-haha/src/Tool.ts:362` |
 | resume 怎么保证可信？ | 先写 user 再调模型 + 边界锚点（预写/version/offset）+ 启动自愈 | `QueryEngine.ts:451` / `history.rs:93` / Grok journal |
 | 多 Agent 何时上？ | 分界条件：≤10 步单 Agent；并行搜集→Orchestrator-Worker（Anthropic 实测提速约90%、token ~15×）；强耦合编辑单线程；多角色→Swarm 但必须 worktree + 禁嵌套 | `AgentTool/builtInAgents.ts` / Ch9 §9.1.2 |

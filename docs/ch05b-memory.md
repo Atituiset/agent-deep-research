@@ -236,7 +236,7 @@ A-MEM（写入时）:
 | **DeepSeek** | **显式内建** | `packages/session/session-projection-cache` + `packages/compaction/compaction-basic` + `compaction-tool-result-pruner` + `RuntimeContextProjection.project()` | 检索时为主，写入时为辅（`session-projection-cache` 缓存投影） | 层次 + 投影 | `tool-result-pruner` 按 tool_result 粒度剪枝 |
 | **OpenCode** | 显式（隐藏 Agent） | `packages/opencode/src/agent/agent.ts:35` `compaction/title/summary` 三类隐藏 agent (`mode:hidden, permission:* deny`) + `agent/prompt/summary.txt` + `Drizzle PartTable` | 压缩时（专用子 agent 后台摘要） | 层次（分页 `MessageV2.page()`）+ 文件 | `Truncate.wrap()` 统一截断，`summary` agent 演化 |
 | **Codex** | 无独立 Memory，用 ContextManager 兼 | `codex-rs/core/src/context_manager/history.rs:93 ContextManager` + `core/src/compact.rs` + `history_version` | 检索时（`for_prompt()` 投影时决定） | 平铺列表 + 版本化 | `history_version` 递增，旧版不改（append-only） |
-| **Pi** | **无内建**，需 `transformContext` 注入 | `packages/agent/src/agent-loop.ts:155 runLoop` + `transformContext(messages, signal) → AgentMessage[]` + `docs/book/12-memory-projection.md` | 完全由用户注入（可写成写入时或检索时） | 取决于注入实现 | 取决于注入实现（示例 `pruneOldMessages` 为固定遗忘） |
+| **Pi** | **无内建**，需 `transformContext` 注入 | `packages/agent/src/agent-loop.ts:155 runLoop` + `transformContext(messages, signal) → AgentMessage[]`（`types.ts:144`） + `docs/book/src/12-memory-projection.md` | 完全由用户注入（可写成写入时或检索时） | 取决于注入实现 | 取决于注入实现（README 示例 `pruneOldMessages` 为固定遗忘） |
 | **Claw** | 原型级 | `rust/crates/runtime/src/session.rs Session{version,messages}` + `src/session_store.py:35 StoredSession` + `compact_after_turns=12` | 固定轮数触发 | 平铺 | `compact()` 简单截断 |
 | **Qwen-Agent** | RAG-as-Memory（特殊 Agent） | `qwen_agent/memory/memory.py:32 Memory(Agent)`：retrieval+doc_parser+keygen（max_ref_token=4000） | 检索时（query→keygen→retrieval.call） | 文档分页片段 | 无演化/遗忘 |
 | **Hermes** | **自策展 + 跨会话检索（第四范式）** | `agent/memory_manager.py` + `memory_provider.py`；FTS5 全文检索历史会话 + LLM 摘要回忆 + Honcho 用户建模；技能自生成 `tools/skill_manager_tool.py:908 _create_skill()` | 写入时（周期 nudge 主动沉淀）+ 使用中自我改进 | 技能库 + 记忆文件 + 全文索引 | 技能迭代演化（Voyager skill library 产品化） |
@@ -264,7 +264,7 @@ A-MEM（写入时）:
 
 #### DeepSeek — `session-projection-cache` + `RuntimeContextProjection`
 
-- **锚点**：`packages/session/session-projection-cache/src/` + `packages/core/agent/src/inbox.ts Inbox` + `packages/compaction/compaction-basic/src/` + `packages/session/session-persistence/src/` + `packages/core/agent-loop/src/agent.ts:64 Phase{idle|maintenance|running}`
+- **锚点**：`packages/session/session-projection-cache/src/` + `packages/core/agent/src/inbox.ts Inbox` + `packages/compaction/compaction-basic/src/` + `packages/session/session-persistence/src/` + `packages/core/agent-loop/src/agent.ts:70 Phase{idle|maintenance|running}`
 - **形态**：
   ```
   Session.append(event) 全量事件（turn/start, step/start/end, assistant/chunk）
@@ -311,7 +311,7 @@ A-MEM（写入时）:
 
 #### Pi — 无内建 Memory，`transformContext` 注入点
 
-- **锚点**：`packages/agent/src/agent-loop.ts:155 runLoop` + `packages/agent/src/types.ts:26 AgentLoopConfig{transformContext}` + `docs/book/12-memory-projection.md` + `docs/book/ch13-compaction.md` 示例 `pruneOldMessages`
+- **锚点**：`packages/agent/src/agent-loop.ts:155 runLoop` + `packages/agent/src/types.ts:144 AgentLoopConfig{transformContext}`（`pruneOldMessages` 示例见 `packages/agent/README.md:193` 与 `types.ts:189` docstring） + `docs/book/src/12-memory-projection.md` + `docs/book/src/13-compaction.md`
 - **形态**：
   ```
   AgentContext.messages: AgentMessage[]  全量（Session）
@@ -446,7 +446,7 @@ A-MEM（写入时）:
 - **定义**：Memory 的抽取/链接/演化从云端大模型下沉到端侧小模型（Haiku / 本地 7B），降低写入成本与隐私风险。
 - **形态**：Claude 已用 Haiku 做 `streamCompactSummary`；A-MEM 论文亦验证 Haiku 级模型在 Note/Link 阶段与 Opus 差距 <5%。
 - **趋势**：`my-agent/src/context.ts` 的 `chars/4` 估算即“零依赖”哲学；端侧 Memory 将复用同一哲学——用小模型做“记忆的脏活”，大模型只做检索时的精排。
-- **信号**：`openCode/packages/opencode/src/provider/provider.ts:100 BundledSDK` 的多 provider 抽象，让“写入用 Haiku、检索用 Opus”的异构调用成为可能。
+- **信号**：`openCode/packages/opencode/src/provider/provider.ts:101 BundledSDK` 的多 provider 抽象，让“写入用 Haiku、检索用 Opus”的异构调用成为可能。
 
 #### 5) Memory as Infrastructure — 记忆即基础设施
 
@@ -602,6 +602,6 @@ function decay(graph: MemoryGraph, now = Date.now()) {
 **本章锚点索引**：
 
 - 论文：MemGPT arXiv 2310.08560 (2023), Voyager arXiv 2305.16291 (2023), Generative Agents UIST 2023 (Stanford), Mem0 arXiv 2504.19413 (2025.04；开源 2024.10), Letta 2024.10, A-MEM arXiv 2502.12110 / NeurIPS 2025, FadeMem 2026.02, Memory in LLM Era 综述 2026.03, memorywire 2026.04, FAISS 2017, Zep arXiv 2501.13956 (2025) / Cognee 2023-2024
-- 源码：`claude-code-haha/src/services/compact/compact.ts:387`, `xai-grok-memory`, `xai-grok-agent/src/compaction.rs:CompactionPolicy`, `xai-chat-state/src/actor/state.rs:estimate_item_tokens`, `deepseek-harness/packages/session/session-projection-cache`, `packages/compaction/compaction-basic`, `opencode/packages/opencode/src/agent/agent.ts:35`, `packages/opencode/src/tool/truncate.ts`, `codex-rs/core/src/context_manager/history.rs:93`, `pi/packages/agent/src/agent-loop.ts:155 runLoop`, `pi/docs/book/12-memory-projection.md`
+- 源码：`claude-code-haha/src/services/compact/compact.ts:387`, `xai-grok-memory`, `xai-grok-agent/src/compaction.rs:CompactionPolicy`, `xai-chat-state/src/actor/state.rs:estimate_item_tokens`, `deepseek-harness/packages/session/session-projection-cache`, `packages/compaction/compaction-basic`, `opencode/packages/opencode/src/agent/agent.ts:35`, `packages/opencode/src/tool/truncate.ts`, `codex-rs/core/src/context_manager/history.rs:93`, `pi/packages/agent/src/agent-loop.ts:155 runLoop`, `pi/docs/book/src/12-memory-projection.md`
 - 衔接：[理论卷 T2](./theory/chapter-02-memory.md) (MemGPT/A-MEM/FadeMem) + `src/chapter-03-context.md` (Token 经济学与摘要)
 

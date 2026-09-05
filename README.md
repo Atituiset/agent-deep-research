@@ -1,13 +1,13 @@
 # Agent Deep Research — 九家 Agent 实现思想对比
 
-基于 **7 家真实 Agent 源码**（Claude Code / Codex / OpenCode / Pi / DeepSeek Harness / Grok Build 等）的由浅入深对比研究。提炼公共知识，给出一页纸速查与 10 周学习路径，落盘为 **mdBook**，可一键发 **GitHub Pages**。
+基于 **9 家真实 Agent 源码**（Claude Code / Codex / OpenCode / Pi / DeepSeek Harness / Grok Build 等）的由浅入深对比研究。提炼公共知识，给出一页纸速查与 10 周学习路径，落盘为 **VitePress**，可一键发 **GitHub Pages**。
 
 > 源码快照：2026-08-22 · 全书结论均标注 `file_path:line_number` 锚点，可回溯
 
 ## 在线阅读
 
 - GitHub Pages（需启用）：`https://<your-org>.github.io/agent-deep-research/`
-- 本地：`mdbook serve --open`
+- 本地：`npm run docs:dev`
 
 ## 本书结构
 
@@ -21,22 +21,22 @@
 | VI 理论底座 | T1–T7 + 附录 TA–TE（原 `agent-infra-research` 全量并入） | Why 视角：理论框架、行业岗位、生态图谱、Safety/Federated、多模态端侧 |
 | 附录 | A 术语表 · B 源码索引 · C 理论卷衔接 · D 中间调研落盘 · E 论文索引 | 可验证 |
 
-详见 `src/SUMMARY.md`。
+目录侧边栏配置见 `docs/.vitepress/config.mts`。
 
 ## 快速开始
 
 ```bash
-# 安装 mdBook（需 Rust）
-cargo install mdbook --version 0.4.52
+# 安装依赖（需 Node.js 18+）
+npm install
 
-# 本地预览
-mdbook serve --open
+# 本地预览（http://localhost:5173）
+npm run docs:dev
 
 # 构建
-mdbook build  # 产物在 book/
+npm run docs:build  # 产物在 docs/.vitepress/dist/
 
-# 可选：仅校验
-mdbook test
+# 预览构建产物
+npm run docs:preview
 ```
 
 ## 研究对象
@@ -54,36 +54,32 @@ mdbook test
 | Qwen-Agent | `../Qwen-Agent` | 唯一纯框架库（对照组） |
 | 理论底座 | ~~`../agent-infra/agent-infra-research`~~ → **已并入本书卷 VI**（2026-08） | 单仓维护，原仓库可归档 |
 
-> 理论卷与源码卷现已同仓：卷 VI 答"为什么"，Ch1–14 答"怎么做的、如何选"。对位表见 `src/appendix-bridge.md`。
+> 理论卷与源码卷现已同仓：卷 VI 答"为什么"，Ch1–14 答"怎么做的、如何选"。对位表见 `docs/appendix-bridge.md`。
 
 ## 一页纸（30 分钟速查）
 
-见 `src/ch09-one-pager.md`：含一页 A4 可打印版、5 分钟陈述框架（总→分→证→选）、7 个高频追问的 30 秒答案、便携卡片。
+见 `docs/ch09-one-pager.md`：含一页 A4 可打印版、5 分钟陈述框架（总→分→证→选）、7 个高频追问的 30 秒答案、便携卡片。
 
 ## 发布到 GitHub Pages
 
 1. 推送到 GitHub，`Settings → Pages → Source: GitHub Actions`
 2. 推送到 `main` 分支自动触发 `.github/workflows/deploy.yml`
-3. 也可本地 `mdbook build` 后把 `book/` 推到 `gh-pages` 分支
-
-## npm 管理（可选）
-
-```bash
-npm install   # 无需，本项目仅用 mdBook；如需 npm 脚本见下方
-npm run book:serve
-npm run book:build
-```
+3. 构建产物 `docs/.vitepress/dist/` 自动部署
 
 ## 目录
 
 ```
 agent-deep-research/
-├── book.toml
-├── src/               # mdBook 正文
+├── docs/                  # VitePress 站点
+│   ├── .vitepress/        # 配置（config.mts）
+│   ├── index.md           # 首页
+│   ├── preface.md         # 前言
+│   ├── ch00-*.md …        # 正文章节
+│   └── theory/            # 卷 VI 理论底座
 ├── .github/workflows/deploy.yml
-├── local-agent.md     # 原始需求
-├── README.md
-└── book/              # 构建产物（gitignore）
+├── local-agent.md         # 原始需求
+├── package.json
+└── README.md
 ```
 
 ## 贡献
@@ -92,7 +88,7 @@ agent-deep-research/
 
 - 每 6 个月重跑一次九家 `git log --oneline` 的 diff
 - 关注 `memorywire` / `two_pass` / `memory_flush` 等新信号
-- 中间调研见 `src/appendix-research-log.md`
+- 中间调研见 `docs/appendix-research-log.md`
 
 ## 许可
 

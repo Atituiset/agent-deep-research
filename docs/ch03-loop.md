@@ -118,7 +118,7 @@ SWE-agent / CodeAct / OpenHands (2024)
 
 - 读 Claude `src/query.ts:219` 的 `while(true)` 时，问自己：若无 Reflexion 的"失败回填"思想，`tool_result` 里的 `error` 为何要原文回填而非丢弃？
 - 读 CodeAct 影响下的 Codex `codex-rs/core/src/tools/` 时，注意`spec() 与 handle() 同 trait`如何消解 CodeAct 之前"多 schema 漂移"的问题。
-- 读 DeepSeek `packages/core/agent-loop/src/agent.ts:64` 的 `Phase` 时，对照 OpenHands 的 `EventStream`：为什么 DeepSeek 需要`maintenance`相而 Pi 不需要？答案在 3.2.3。
+- 读 DeepSeek `packages/core/agent-loop/src/agent.ts:70` 的 `Phase`（type Phase :39） 时，对照 OpenHands 的 `EventStream`：为什么 DeepSeek 需要`maintenance`相而 Pi 不需要？答案在 3.2.3。
 
 ---
 
@@ -280,7 +280,7 @@ class BlockAssembler {
 #### FSM 形式化
 
 ```ts
-// DeepSeek: packages/core/agent-loop/src/agent.ts:64 ReactLoopAgent
+// DeepSeek: packages/core/agent-loop/src/agent.ts:70 ReactLoopAgent（type Phase :39）
 type Phase =
   | { kind: 'idle' }                                    // 无 turn 运行，可接受新输入
   | { kind: 'running'; turn: TurnState; step: StepState } // 正在 turn 内
@@ -356,7 +356,7 @@ const transitions: Record<string, Phase['kind'][]> = {
 - **协作式取消（Cooperative）**：`AbortSignal / cancellation_token` 仅在"可抢占点"检查（`stream.next()` / `tool.execute` 起点）。优点是状态一致，缺点是"正在执行的 `bash` 无法瞬间杀死"。
 - **抢占式取消（Preemptive）**：`AbortController.abort()` + `sandbox kill`。优点是响应快，缺点是需处理"半写入文件"与"半累积的 `in_flight` JSON"。
 
-生产级均为**协作 + 抢占混合**：流消费协作检查，工具执行抢占 kill（`codex-rs/core/src/tools/context.rs:55 ToolInvocation{cancellation_token, tracker}`）。
+生产级均为**协作 + 抢占混合**：流消费协作检查，工具执行抢占 kill（`codex-rs/core/src/tools/context.rs:56 ToolInvocation{cancellation_token, tracker}`）。
 
 #### 3.2.4.2 Inbox / InputQueue 的精确语义（DeepSeek 最精确）
 
@@ -390,7 +390,7 @@ class Inbox {
 | 家 | 机制 | 精度 | 关键文件 |
 |----|------|------|----------|
 | DeepSeek | `Inbox.splice(target)` + `wakeRequested / wakingAfterAbort` 闩锁 | **最高**：区分 `next-turn` vs `next-step`，防重入误分类 | `packages/core/agent/src/inbox.ts` |
-| Codex | `InputQueue` + `TurnInput{UserInput\|InterAgentCommunication}` + `drain_pending_input()` | 中：每 turn 起点排空，turn 内不抢占 | `codex-rs/core/src/session/input_queue.rs:19` |
+| Codex | `InputQueue` + `TurnInput{UserInput\|InterAgentCommunication}` + `drain_pending_input()` | 中：每 turn 起点排空，turn 内不抢占 | `codex-rs/core/src/session/input_queue.rs:21` |
 | Pi | `AgentLoopConfig.getSteeringMessages()/getFollowUpMessages()` 回调式 | 低：回调注入，无队列语义 | `packages/agent/src/agent-loop.ts:155 runLoop` |
 | Claude | `withheld` 扣留 + `StreamingToolExecutor.getCompletedResults()` 并行回吐 | 中高：工具结果与 steer 合并回填，`withheld` 保证不丢 | `src/query.ts:219` + `src/services/tools/` |
 | Grok | `ChatStateActor` 单 task 串行消费 `Command` | 高：Actor 串行天然无竞态，`Oneshot` 回执 | `crates/codegen/xai-chat-state/src/actor/mod.rs` |
@@ -428,7 +428,7 @@ class Inbox {
 #### 3.2.4.4 工具执行的取消
 
 ```rust
-// Codex: codex-rs/core/src/tools/context.rs:55
+// Codex: codex-rs/core/src/tools/context.rs:56
 pub struct ToolInvocation {
     pub cancellation_token: CancellationToken, // tokio_util::sync::CancellationToken
     pub tracker: Arc<ToolTracker>,            // 上报 is_completed / is_running
@@ -458,10 +458,10 @@ Claude 的 `StreamingToolExecutor` 进一步做到"工具边收边执行"：`add
 | **Claude** | `src/query.ts:219 query()` 的 `while(true)` + `hop≤25` | `attemptWithFallback()` 指数退避 + 模型降级 | `for await (message of deps.callModel())` + `StreamingToolExecutor.addTool()` 边收边执行 | `ToolOrchestrator: approval → sandbox → execute → hook → 回填` + `withheld` 扣留 | `handleStopHooks / toolUseSummary / max_output_tokens / shouldStopAfterTurn` | **生产 while + 增量流** |
 | **Codex** | `codex-rs/core/src/session/turn.rs:153 run_turn()` | `run_sampling_request()` + `responses_retry.rs` | `try_run_sampling_request()` 内 `stream.next()` + `ResponseEvent{OutputItemAdded/Done, ToolCallInputDelta}` 累积 `in_flight` | `ToolExecutor<Invocation>{spec(),handle()}` + `ToolCallRuntime(RwLock)` 并行门闸 + `sandboxing.rs` | `needs_follow_up` / `HopLimit` | **FSM 二分 Context** |
 | **Pi** | `packages/agent/src/agent-loop.ts:155 runLoop` 外层 `while(true)` + 内层 `while(hasMore)` | `streamAssistantResponse()` 内重试（可注入） | `streamFn` 事件流 → `message.content.filter(isToolCall)` | `AgentTool{id,parameters,execute}` + `ToolExecutionMode{sequential\|parallel}` | `shouldStopAfterTurn / getFollowUpMessages / getSteeringMessages` | **教学 while（最小闭环）** |
-| **DeepSeek** | `packages/core/agent-loop/src/agent.ts:64 kick()→turn()→step()` + `Phase{idle\|maintenance\|running}` | `step(){ while(true){buildRequest→stream; if(error) normalizeLlmFailure→continue } }` | `BlockAssembler.push(chunk)` → `block-start/delta/block-end` + `chunkSeqs → sourceEventSeqs` | `Cordis` 插件化 `dsh-tool-*` + `executeToolCalls()` 批量串行注入 | `completed vs blocked vs null` + `turnEnds=max-tokens` 黏性 | **状态机 FSM（最精确）** |
+| **DeepSeek** | `packages/core/agent-loop/src/agent.ts:70 kick()→turn()→step()` + `Phase{idle\|maintenance\|running}` | `step(){ while(true){buildRequest→stream; if(error) normalizeLlmFailure→continue } }` | `BlockAssembler.push(chunk)` → `block-start/delta/block-end` + `chunkSeqs → sourceEventSeqs` | `Cordis` 插件化 `dsh-tool-*` + `executeToolCalls()` 批量串行注入 | `completed vs blocked vs null` + `turnEnds=max-tokens` 黏性 | **状态机 FSM（最精确）** |
 | **Grok** | `xai-chat-state` Actor + `xai-agent-lifecycle` | `SamplingClient` 三后端×六端点 + `deserialize_response_event()` | `ChatStateActor` 单 task 串行消费 `Command`，`turn_capture.turn_start_offset` | `ToolBridge + xai-tool-runtime ToolRegistry{ToolKind→vendorName}` + `merge_tool_params` | `TurnCaptureState` + `CompactionPolicy.should_auto_compact(85%)` | **Actor 隔离** |
 | **OpenCode** | `packages/opencode/src/session/session.ts:224 Info Schema` (Effect) | `tool/registry` 驱动 + `BundledSDK.languageModel` | `tool/tool.ts:50 execute(ctx: Effect)` | `Tool.Def{parameters,jsonSchema,execute:Effect}` + `PermissionV1.Ruleset` + `Truncate.wrap()` | `Agent.steps` + `agent/prompt/compaction.txt` 隐藏 agent | **Effect + 隐藏 agent** |
-| **Claw** | `rust/crates/runtime/src/conversation.rs:117 ConversationRuntime.run_turn` | `ApiClient::stream` | `build_assistant_message(events)` | `rust/crates/tools/src/lib.rs ToolPool` | `max_iterations` | **批量流（反例）** |
+| **Claw** | `rust/crates/runtime/src/conversation.rs:91 ConversationRuntime`（`run_turn()` :153） | `ApiClient::stream` | `build_assistant_message(events)` | `rust/crates/tools/src/lib.rs ToolPool` | `max_iterations` | **批量流（反例）** |
 | Hermes | `agent/conversation_loop.py:1766 run_conversation()`（单体式主循环；网关进程缓存 agent 实现跨 turn 复用；MoA/子代理经 async_delegation 并行） |
 
 > 一句话区分：**最小闭环（Pi）只有外层与"工具后回填"；生产级（Claude/Codex/DeepSeek/Grok）在中/内层叠加了重试、流式工具累积、预算闸与取消语义**。
@@ -611,7 +611,7 @@ export async function runLoop(
 - **局限**：无 `TurnContext/StepContext` 二分，`tool_router` 在循环内不变，若回合中途切模型需重启整个 `runLoop`；无 `TurnCaptureState`，崩溃无法按 offset 重放。
 - **一句话陈述**："我能手写 Pi 的 `runLoop`，并指出生产级需在其上加的 5 个闸：预算、重试、装配、取消、观测。"
 
-#### DeepSeek — `packages/core/agent-loop/src/agent.ts:64 ReactLoopAgent`
+#### DeepSeek — `packages/core/agent-loop/src/agent.ts:70 ReactLoopAgent（type Phase :39）`
 
 ```ts
 // 状态机形态（TS 伪代码，对应 Rust 侧 Phase 枚举）
@@ -749,7 +749,7 @@ impl ChatState {
 - **`turn_capture.turn_start_offset` 的批量投影**：`capture_from(offset)` 返回 `offset..` 的切片，避免每条消息克隆，是 Grok 在 200K 上下文下保持性能的关键。
 - **自愈（`ChatState::new()`）**：`dedup_duplicate_tool_results` 去重崩溃前重复写入的 `tool_result`，`repair_dangling_tool_calls` 为无 `tool_result` 的 `tool_call` 补 `error` 占位，避免下一轮采样因缺 `tool_result` 而 PTL。
 
-#### OpenCode — `packages/opencode/src/session/session.ts:102` + `tool/tool.ts:50`
+#### OpenCode — `packages/opencode/src/session/session.ts:224 Info Schema` + `tool/tool.ts:55 Def`
 
 ```ts
 // Session.Service（Effect 形态）
@@ -796,7 +796,7 @@ export const Truncate = {
 - **隐藏 compaction agent**（`agent/agent.ts:35 Info{mode:hidden, permission:* deny}`）：压缩由专用子 agent 执行（`compaction/title/summary` 三类，见 `agent/prompt/compaction.txt`），权限`* deny`保证不触文件，是"压缩即子 Agent"的干净隔离。
 - **统一截断**：`Truncate.wrap()` 在工具层统一做，而非散落在各工具内部，避免某工具绕过截断导致 context 爆炸（与 Claude `src/services/tools/toolOrchestration.ts` 末端截断同策，但 OpenCode 更彻底）。
 
-#### Claw — `rust/crates/runtime/src/conversation.rs:117 ConversationRuntime`
+#### Claw — `rust/crates/runtime/src/conversation.rs:91 ConversationRuntime`（`run_turn()` :153）
 
 ```rust
 // 骨架（Rust 伪代码）
@@ -829,7 +829,7 @@ impl ConversationRuntime {
 
 - **批量流的代价**：`ApiClient::stream() → Vec<AssistantEvent>` 一次性返回整批事件，代码最短，但在 20+ hop 长链路上无法做"边收边执行"与"中途取消"。`build_assistant_message(events)` 需等待整批事件收全后才起工具执行，首个工具的启动延迟 = 整轮采样延迟。
 - **`compact_after_turns=12` 的粗糙**：固定轮数触发压缩，而非 token 预算驱动（Claude `effectiveWindow-13k` / Grok `85%`）。在"单轮输出 30K token 的长工具结果"场景，12 轮前已 PTL；在"短轮 20 turn"场景又过早压缩，浪费可缓存前缀。
-- **移植价值**：`claw-code-main/src/tools.py:96 load_tool_snapshot()` 展示如何把 TS 的 `Tool.Def` 翻译为 Rust 的 `ToolPool`，是"TS→Rust 移植"的桥梁案例。
+- **移植价值**：`claw-code-main/src/tools.py:24 load_tool_snapshot()` 展示如何把 TS 的 `Tool.Def` 翻译为 Rust 的 `ToolPool`，是"TS→Rust 移植"的桥梁案例。
 
 ### 3.3.3 七家对证小结：一张"闸"的有无表
 
@@ -853,7 +853,7 @@ impl ConversationRuntime {
 | 风格 | 代表 | 形态 | 优点 | 代价 | 适用场景 |
 |------|------|------|------|------|----------|
 | **简单 while** | Claude `src/query.ts:219 query()`, Pi `packages/agent/src/agent-loop.ts:155 runLoop` | `while(true){ llm→tools→push }` + `hop≤25` | 直观、易读、易测试；`AsyncGenerator` 直接 `yield` 增量 | 打断/恢复需额外状态（`withheld`）；`maintenance` 不可打断难表达 | 教学演示、手写练习、单 turn 批量任务、无需采样中打断 |
-| **状态机 FSM** | DeepSeek `packages/core/agent-loop/src/agent.ts:64 Phase{idle\|maintenance\|running}` | `idle→running{turn{step}}→idle` + `maintenance` | 天然支持暂停/恢复/并发；`splice(next-turn vs next-step)` 精度最高 | 代码量大、状态迁移易遗漏；需`wakingAfterAbort`等闩锁防重入 | 需"采样中打断"且`maintenance`不可打断的生产 Agent |
+| **状态机 FSM** | DeepSeek `packages/core/agent-loop/src/agent.ts:70 Phase{idle\|maintenance\|running}` | `idle→running{turn{step}}→idle` + `maintenance` | 天然支持暂停/恢复/并发；`splice(next-turn vs next-step)` 精度最高 | 代码量大、状态迁移易遗漏；需`wakingAfterAbort`等闩锁防重入 | 需"采样中打断"且`maintenance`不可打断的生产 Agent |
 | **Actor 隔离** | Grok `crates/codegen/xai-chat-state/src/actor/mod.rs ChatStateActor` | 单 `tokio::task` 拥有 `ChatState`，外部仅发 `Command` | 无锁、崩溃自愈（`dedup+repair`）、批量投影（`turn_start_offset`） | 跨 task 查询需 `Oneshot`，链路多一跳；`Command` 枚举膨胀 | 高并发、多租户、需崩溃自愈的云端 Agent |
 | **二分 Context** | Codex `TurnContext` vs `StepContext` (`session/step_context.rs:17`) | Turn 稳定、Step 快照；`build_tool_router()` 每步重建 | 回合中途切模型/工具清单稳定；`I2`（同快照）天然满足 | 概念负担；`StepContext` 需逐 step 克隆部分状态 | 工具集/模型在 turn 内可变（MCP 动态装卸、模型降级） |
 

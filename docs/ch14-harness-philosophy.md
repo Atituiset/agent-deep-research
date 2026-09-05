@@ -46,7 +46,7 @@ Harness 的每个思想都能沿三层证据链回溯。这张表是本章的地
 | Pi | 库交还宿主 | pnpm 5 包极简 | 回调注入一切 | beforeToolCall 钩子 | extension 包 |
 | Qwen-Agent | 库交还宿主 | 单仓 Python 包 | TOOL_REGISTRY 注册制 | 信任宿主（无沙箱无权限） | mcpServers 即插 |
 | Claw | 镜像上游 | Python+Rust 双轨 | 复刻上游 | 内联 authorize | 无 |
-| Hermes | 产品全托管(网关) | Python 单体(9215 行) | **技能自生成** | 审批工具化+环境式 | agentskills.io |
+| Hermes | 产品全托管(网关) | Python 单体(9207 行) | **技能自生成** | 审批工具化+环境式 | agentskills.io |
 
 ## 14.3 轴1 控制权：workflow 还是 agent？
 
@@ -61,7 +61,7 @@ Anthropic《Building Effective Agents》给出被广泛引用的分界：**workf
 ## 14.4 轴2 工程组织：单体与微内核之争
 
 ```
-单体派    Hermes run_agent.py 9215 行 —— 研究迭代速度优先
+单体派    Hermes run_agent.py 9207 行 —— 研究迭代速度优先
 微内核派  Codex(Bazel+30 crate) · Grok(50+ crate) · DeepSeek(Cordis 60 包) —— 团队协作优先
 分层折中  OpenCode(Effect Layer 强制注入) · Claude(ts 大仓目录约定)
 极简派    Pi(agent 包 <3000 行) —— 教学优先

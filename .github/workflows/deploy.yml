@@ -1,4 +1,4 @@
-name: Deploy mdBook to GitHub Pages
+name: Deploy VitePress site to GitHub Pages
 
 on:
   push:
@@ -19,16 +19,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install mdBook
-        run: |
-          cargo install mdbook --version 0.4.52 --locked || cargo install mdbook --locked
-          mdbook --version
-      - name: Build book
-        run: mdbook build
+        with:
+          fetch-depth: 0 # 用于 lastUpdated 获取完整 git 历史
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build site
+        run: npm run docs:build
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: book
+          path: docs/.vitepress/dist
 
   deploy:
     needs: build

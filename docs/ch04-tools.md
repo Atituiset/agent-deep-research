@@ -234,7 +234,7 @@ export const readFileTool = buildTool({
 
 > **对证点**：Codex 把这一约束焊在类型系统层面——`ToolExecutor<Invocation> { fn spec(&self) -> ToolSpec; fn handle(&self, inv: Invocation) -> Result }` (`codex-rs/tools/src/tool_executor.rs:106`)。`spec()` 与 `handle()` 同 trait，编译期即保证"能描述的必能执行"。
 
-**失败案例 1 — Claw 早期 `src/tools.py:96` 的分离式快照：**
+**失败案例 1 — Claw 早期 `src/tools.py:24 load_tool_snapshot()` 的分离式快照：**
 
 ```py
 # 反模式：schema 在 YAML，执行在 Python，手工同步
@@ -260,10 +260,10 @@ def load_tool_snapshot(yaml_path):
 解法：分级暴露，让模型首轮只看到"目录"，按需加载"正文"
 ```
 
-**Codex 的四级模型（最精细，`codex-rs/tools/src/tool_spec.rs:20` + `core/src/tools/spec_plan.rs:117`）：**
+**Codex 的四级模型（最精细，`codex-rs/tools/src/tool_spec.rs:22` + `core/src/tools/spec_plan.rs:117`）：**
 
 ```rust
-// codex-rs/tools/src/tool_spec.rs:20
+// codex-rs/tools/src/tool_spec.rs:22
 pub enum ToolExposure {
     Direct,        // 首轮即暴露完整 schema，常驻
     Deferred,      // 首轮仅暴露存根（name + one-line description），需 ToolSearch 激活
@@ -616,7 +616,7 @@ interface AgentLoopConfig {
 
 | 维度 | Claude Code | Codex | Grok Build | OpenCode | Pi | DeepSeek Harness | Claw |
 |------|-------------|-------|------------|----------|----|------------------|------|
-| **同源载体** | `src/Tool.ts:362 Tool<Input,Output>` + `buildTool()` | `codex-rs/tools/src/tool_executor.rs:106 ToolExecutor<Invocation>{spec(),handle()}` | `crates/codegen/xai-grok-tools/src/bridge.rs ToolBridge` + `xai-tool-runtime ToolRegistry` | `packages/opencode/src/tool/tool.ts:55 Def{parameters,jsonSchema,execute:Effect}` | `packages/agent/src/types.ts AgentTool{id,parameters,execute}` | `dsh-tool-*` 独立包 + `tool-calls.ts:executeToolCalls()` + `Cordis` 插件总线 | `src/tools.py:96 load_tool_snapshot()` + `ToolPool` / `rust/crates/tools/src/lib.rs` |
+| **同源载体** | `src/Tool.ts:362 Tool<Input,Output>` + `buildTool()` | `codex-rs/tools/src/tool_executor.rs:106 ToolExecutor<Invocation>{spec(),handle()}` | `crates/codegen/xai-grok-tools/src/bridge.rs ToolBridge` + `xai-tool-runtime ToolRegistry` | `packages/opencode/src/tool/tool.ts:55 Def{parameters,jsonSchema,execute:Effect}` | `packages/agent/src/types.ts AgentTool{id,parameters,execute}` | `dsh-tool-*` 独立包 + `tool-calls.ts:executeToolCalls()` + `Cordis` 插件总线 | `src/tools.py:24 load_tool_snapshot()` + `ToolPool` / `rust/crates/tools/src/lib.rs` |
 | **注册与发现** | `src/tools.ts:194 getAllBaseTools()` → `assembleToolPool()` 分区排序 | `core/src/tools/spec_plan.rs:117 build_tool_router()` 每 StepContext 重建 | `ToolRegistry{ToolKind→vendorName}` + `merge_tool_params()` | `tool/registry.ts` + `agent/agent.ts:35 Info{mode}` | `AgentTool[]` 数组 + `extensions pi-extension-*` | `Cordis` 服务依赖注入 + `preset.yml` 组合 | `ToolPool` 快照 |
 | **可见性分级** | `ToolSearchTool` + `exposure: Direct\|Deferred\|Hidden` + `defer_loading` | `ToolExposures bitflags{NONE/DIRECT/DEFERRED/CODE_MODE/ALL}` | `ToolRegistry` + `apply_workflow_tool_gates()` | `Info{mode:subagent\|primary\|all}` + `native:true` 隐藏 | `AgentLoopConfig.toolExecution` | `Cordis` preset (`code/standard/minimal/cordis`) | 无（全量暴露） |
 | **权限载体** | `ToolPermissionContext{mode, additionalWorkingDirectories, allow/deny/ask}` | `AskForApproval` + `ToolRuntime/SandboxAttempt/ExecApprovalRequirement` | `ToolServerConfig{tools: Vec<ToolConfig>}` + `kind_for()` | `PermissionV1.Ruleset` + `Permission.merge()` | `AgentTool` 级 `isReadOnly` | `Inbox` + `waterfall 'agent/pre-step' decision{enter\|reject}` | `~/.claw/settings.json` |
@@ -668,7 +668,7 @@ pub trait ToolExecutor {
     fn handle(&self, invocation: Self::Invocation) -> impl Future<Output = ToolResult>;
 }
 
-// codex-rs/tools/src/tool_spec.rs:20
+// codex-rs/tools/src/tool_spec.rs:22
 pub enum ToolExposure { Direct, Deferred, CodeModeOnly, Hidden }
 
 // core/src/tools/spec_plan.rs:117
@@ -776,10 +776,10 @@ dsh-skill      ─┘         ├─► waterfall 'agent/pre-step' (权限决策
 
 每个工具是独立 npm 包，通过 `Cordis` 服务依赖注入组合。`Inbox` 的 `next-step vs next-turn` 精确打断语义是七家中最细的（见 Ch3）。`dsh-tool-bash/bashing-persistent/pwsh` 提供多 shell 后端，适配 Windows/Linux。
 
-**Claw — 桥梁价值的"移植中" (`src/tools.py:96`)**
+**Claw — 桥梁价值的"移植中" (`src/tools.py:24 load_tool_snapshot()`)**
 
 ```py
-# src/tools.py:96
+# src/tools.py:24 load_tool_snapshot()
 def load_tool_snapshot(path: str) -> ToolSnapshot:
     return ToolSnapshot(yaml.safe_load(open(path)))      # 早期仅名字过滤，无 schema 同源
 # rust/crates/tools/src/lib.rs (移植后)
@@ -1004,7 +1004,7 @@ Grok 的 `list_skills_with_plugins` + `plugin_registry` 与 DeepSeek 的 `Cordis
 
 今日权限是**静态规则表**（`allow/deny/ask` + 通配匹配），未来是**可验证的策略代码**：
 
-```rego
+```txt
 # 未来：OPA/Rego 风格的 Policy-as-Code（构想）
 package agent.tools
 

@@ -85,7 +85,7 @@ while (true) { // outer: followUp
 }
 ```
 
-生产形态（Claude `src/query.ts:219` / Codex `codex-rs/core/src/session/turn.rs:153` / DeepSeek `packages/core/agent-loop/src/agent.ts:64`）在此基础上叠加：
+生产形态（Claude `src/query.ts:219` / Codex `codex-rs/core/src/session/turn.rs:153` / DeepSeek `packages/core/agent-loop/src/agent.ts:70 ReactLoopAgent`）在此基础上叠加：
 
 - 三层嵌套：`turn loop → sampling retry loop → stream consume loop`
 - 中断语义：`Inbox.splice(next-turn vs next-step)` / `InputQueue.steer`
@@ -93,7 +93,7 @@ while (true) { // outer: followUp
 
 > 公共规律：**Loop 的本质是"采样→执行→回填"的闭合**，所有可靠性增强（重试、压缩、取消）都是在这个闭合上加"闸"。详见 Ch3 精读。
 
-> 反例：若 Loop 无 `hop` 上限（Claude/Pi 的 `25`），模型在工具错误循环中会**无限采样**；若无 `cancellation_token`（`codex-rs/core/src/tools/context.rs:55`），用户 `Ctrl-C` 无法中断正在执行的 `bash`。
+> 反例：若 Loop 无 `hop` 上限（Claude/Pi 的 `25`），模型在工具错误循环中会**无限采样**；若无 `cancellation_token`（`codex-rs/core/src/tools/context.rs:56`），用户 `Ctrl-C` 无法中断正在执行的 `bash`。
 
 ### 3) Tools — 规格与执行同源、权限是横切面
 
@@ -113,7 +113,7 @@ ToolSpec（可序列化为 LLM 可见的 JSON）  ←→  ToolExecutor（可执�
 - **可见性分级**：Codex `ToolExposures bitflags{NONE/DIRECT/DEFERRED/CODE_MODE/ALL}`、Claude `ToolSearch defer_loading`、OpenCode `native:true` 的隐藏 agent——都在解"首轮 schema 预算"这道题
 - **权限是横切面**：不在每个工具里 `if (allowed)`，而在编排器统一拦截（Claude `ToolPermissionContext`、Codex `AskForApproval`、OpenCode `PermissionV1.Ruleset`）
 
-> 反例：若规格与执行分离（如早期 Claw `src/tools.py:96` 仅做名字过滤），会出现**schema 漂移**——模型按旧 `parameters` 传参，执行侧已改校验，导致批量 `InvalidArgumentsError`。Codex 将 `spec()` 焊在 `handle()` 同一 trait 上即为对此的修正。
+> 反例：若规格与执行分离（如早期 Claw `src/tools.py:24 load_tool_snapshot()` 仅做名字过滤），会出现**schema 漂移**——模型按旧 `parameters` 传参，执行侧已改校验，导致批量 `InvalidArgumentsError`。Codex 将 `spec()` 焊在 `handle()` 同一 trait 上即为对此的修正。
 
 详见 Ch4。
 
@@ -129,7 +129,7 @@ Token 预算 ──► 估算（chars/4 或 tiktoken）──► 触发阈值 �
 
 - **估算**：除 Qwen-Agent 外几乎都用 `chars/4`（`claude-code-haha/src/utils/tokens.ts`、Grok `xai-chat-state/src/actor/state.rs:estimate_item_tokens`），显式放弃 `tiktoken` 以换取零依赖与速度
 - **触发**：生产级均为 **token 预算驱动**（Claude `effectiveWindow-13k`、Grok `85%`、Codex `history_version`），仅原型用轮数驱动（Claw `compact_after_turns=12`）
-- **投影**：`Session` 保留全量，`for_prompt()` / `transformContext` / `RuntimeContextProjection.project()` 产出 LLM 可见子集（Pi `docs/book/12-memory-projection.md`）
+- **投影**：`Session` 保留全量，`for_prompt()` / `transformContext` / `RuntimeContextProjection.project()` 产出 LLM 可见子集（Pi `docs/book/src/12-memory-projection.md`）
 
 > 反例：若 Context 直接重写 Session（而非投影），`--resume` 与 `Session.fork()` 会丢失血缘；Pi 的两阶段 `transformContext → convertToLlm` 正是为了让压缩发生在 `AgentMessage` 层，不污染 `Message` 持久化层。
 

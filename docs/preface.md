@@ -17,11 +17,11 @@
 | 代号 | 仓库 | 语言/形态 | 定位 |
 |------|------|-----------|------|
 | **Claude Code** | `claude-code-haha` (`src/query.ts:219`) | TS+Bun 产品级 | 泄露的 Anthropic 内部实现，功能最全 |
-| **Claw** | `claw-code-main` (`rust/crates/runtime/src/conversation.rs:117`) | Python 镜像+Rust | 社区移植，"反例库" |
+| **Claw** | `claw-code-main` (`rust/crates/runtime/src/conversation.rs:91`) | Python 镜像+Rust | 社区移植，"反例库" |
 | **Codex** | `codex` (`codex-rs/core/src/session/turn.rs:153`) | Rust+Bazel 产品级 | OpenAI 官方，最系统化 |
-| **OpenCode** | `opencode` (`packages/opencode/src/session/session.ts:102`) | TS+Effect+Bun | SST 团队开源产品 |
+| **OpenCode** | `opencode` (`packages/opencode/src/session/session.ts:224 Info Schema`) | TS+Effect+Bun | SST 团队开源产品 |
 | **Pi** | `pi` (`packages/agent/src/agent-loop.ts:155 runLoop`) | TS 库+TUI | 教学级最小闭环 |
-| **DeepSeek Harness** | `deepseek-harness` (`packages/core/agent-loop/src/agent.ts:64`) | TS+Cordis 插件化 | DeepSeek 的 Harness |
+| **DeepSeek Harness** | `deepseek-harness` (`packages/core/agent-loop/src/agent.ts:70`) | TS+Cordis 插件化 | DeepSeek 的 Harness |
 | **Grok Build** | `grok-build` (`crates/codegen/xai-chat-state/src/actor/state.rs`) | Rust Actor | xAI 实现，可靠性标杆 |
 | **Qwen-Agent** | `Qwen-Agent` (`qwen_agent/agent.py:31`) | Python 纯框架库 | 阿里通义；**库形态对照组** |
 | **Hermes Agent** | `hermes-agent` (`agent/conversation_loop.py:1766`) | Python 单体+网关 | Nous Research；自改进学习闭环 |
