@@ -84,18 +84,18 @@
 | `crates/codegen/xai-grok-agent/src/builder.rs:42 AgentBuilder` | 51 个 `with_*` 流式配置方法 |
 | `crates/codegen/xai-fast-worktree` | `btrfs/overlay` 快速分支 |
 
-## 理论卷（`src/theory/`，原 agent-infra-research，2026-08 并入）
+## 理论卷（`docs/theory/`，原 agent-infra-research，2026-08 并入）
 
 | 锚点 | 说明 |
 |------|------|
-| `src/theory/chapter-01-landscape.md` | 六组件模型 + 五约束 |
-| `src/theory/chapter-02-memory.md` | MemGPT/A-MEM/FadeMem + 写入时代理 + 不可能三角 |
-| `src/theory/chapter-03-context.md` | Token 经济学 + Prompt Caching + 摘要五类型 |
-| `src/theory/chapter-04-runtime.md` | FSM vs while + `my-agent` 基线 |
-| `src/theory/chapter-05-industry.md` | 行业岗位信号（ByteDance Memory Infra JD 解读） |
-| `src/theory/chapter-06-ecosystem.md` | 框架/向量库/标准化生态图谱 |
-| `src/theory/appendix-b.md` | **被否决的观点及原因**（负知识，源码卷无对位） |
-| `src/theory/appendix-d.md` / `appendix-e.md` | Safety/Federated Memory；多模态 Memory 与端侧推理 |
+| `docs/theory/chapter-01-landscape.md` | 六组件模型 + 五约束 |
+| `docs/theory/chapter-02-memory.md` | MemGPT/A-MEM/FadeMem + 写入时代理 + 不可能三角 |
+| `docs/theory/chapter-03-context.md` | Token 经济学 + Prompt Caching + 摘要五类型 |
+| `docs/theory/chapter-04-runtime.md` | FSM vs while + `my-agent` 基线 |
+| `docs/theory/chapter-05-industry.md` | 行业岗位信号（ByteDance Memory Infra JD 解读） |
+| `docs/theory/chapter-06-ecosystem.md` | 框架/向量库/标准化生态图谱 |
+| `docs/theory/appendix-b.md` | **被否决的观点及原因**（负知识，源码卷无对位） |
+| `docs/theory/appendix-d.md` / `appendix-e.md` | Safety/Federated Memory；多模态 Memory 与端侧推理 |
 
 ---
 
@@ -114,7 +114,7 @@
 | `qwen_agent/multi_agent_hub.py:22 MultiAgentHub` | 多 Agent 组合器（_agents 列表）；agents/router.py 路由、group_chat.py 群聊 |
 | `qwen_agent/llm/base.py:61 BaseChatModel` | 模型注册表工厂 get_chat_model；`llm/function_calling.py` + `llm/fncall_prompts/` 文本协议模拟 FC（非原生 FC 模型可用）|
 | `qwen_agent/tools/base.py:24 TOOL_REGISTRY` | 全局工具注册表 + register_tool 装饰器；MCPManager 支持 mcpServers |
-| `qwen_agent/utils/tokenization_qwen.py` | 真 tiktoken 计数（qwen.tiktoken），八家中唯一非 chars/4 |
+| `qwen_agent/utils/tokenization_qwen.py` | 真 tiktoken 计数（qwen.tiktoken），九家中唯一非 chars/4 |
 
 > Qwen-Agent 的对照价值：Session/Trace/权限三层留白给宿主——与产品形态五家形成"库 vs 产品"分水岭，专节分析见 7.3.2 / 10.3.2 / 11.3.2。
 

@@ -1,6 +1,6 @@
 # 附录 C 理论卷（卷 VI）衔接与阅读路径
 
-> 原独立仓库 `agent-infra-research` 已于 2026-08 **全量并入本书卷 VI**（`src/theory/`，T1–T7 + 附录 TA–TE），此后只需维护本仓库。理论卷不是源码卷的重写，而是其**概念底座**：两卷形成"理论 → 源码 → 实践"的闭环。
+> 原独立仓库 `agent-infra-research` 已于 2026-08 **全量并入本书卷 VI**（`docs/theory/`，T1–T7 + 附录 TA–TE），此后只需维护本仓库。理论卷不是源码卷的重写，而是其**概念底座**：两卷形成"理论 → 源码 → 实践"的闭环。
 
 ## 定位互补
 
@@ -15,13 +15,13 @@
 
 | 理论卷章节 | 源码卷对位 | 衔接说明 |
 |--------------------|---------|---------|
-| T1 全景 | Ch1 全景 + Ch2 公共模型 | 前者给六组件模型与五约束，后者给六件套心智模型与 200 行闭环 |
-| T2 Memory | Ch6 Memory 深潜 | 前者讲 MemGPT/A-MEM/FadeMem 的"为什么"（含不可能三角、五问表），后者讲九家的"估算→预算→压缩→投影"怎么落地 |
-| T3 Context | Ch5 Context 工程 | 前者讲 Token 经济学与摘要五类型，后者讲四层防线与 Prompt Caching 断点稳定 |
-| T4 Runtime | Ch3 Loop + Ch4 Tools + Ch9 多 Agent | 前者讲 FSM vs while 与 ReAct/Plan-Execute/Multi-Agent 三模式，后者给七家三层嵌套与显式规划容器 |
-| T5 Industry | Ch13 一页纸 + Ch12 路线 | 前者讲岗位信号与技能栈（ByteDance Memory Infra JD 逐句解读等独家内容），后者给可直接背诵的要点与实战路径 |
-| T6 Ecosystem | Ch4 Tools(MCP) + Ch8 Model | 前者讲框架/向量/标准生态，后者讲 MCP/Skill 与多 provider 抽象 |
-| T7 Roadmap | Ch12 路线 | 前者是理论驱动的 4 Phase，后者是源码驱动的四阶段实战（每周产出）；两份路线可并行使用 |
+| [T1 全景](./theory/chapter-01-landscape.md) | [Ch1 全景](./ch01-landscape.md) + [Ch2 公共模型](./ch02-common-model.md) | 前者给六组件模型与五约束，后者给六件套心智模型与 200 行闭环 |
+| [T2 Memory](./theory/chapter-02-memory.md) | [Ch6 Memory 深潜](./ch05b-memory.md) | 前者讲 MemGPT/A-MEM/FadeMem 的"为什么"（含不可能三角、五问表），后者讲九家的"估算→预算→压缩→投影"怎么落地 |
+| [T3 Context](./theory/chapter-03-context.md) | [Ch5 Context 工程](./ch05-context.md) | 前者讲 Token 经济学与摘要五类型，后者讲四层防线与 Prompt Caching 断点稳定 |
+| [T4 Runtime](./theory/chapter-04-runtime.md) | [Ch3 Loop](./ch03-loop.md) + [Ch4 Tools](./ch04-tools.md) + [Ch9 多 Agent](./ch08-multi-agent.md) | 前者讲 FSM vs while 与 ReAct/Plan-Execute/Multi-Agent 三模式，后者给九家的 Loop 三层嵌套（Ch3.2.2）与显式规划容器（Ch9.2.1） |
+| [T5 Industry](./theory/chapter-05-industry.md) | [Ch13 一页纸](./ch09-one-pager.md) + [Ch12 路线](./ch10-roadmap.md) | 前者讲岗位信号与技能栈（ByteDance Memory Infra JD 逐句解读等独家内容），后者给可直接背诵的要点与实战路径 |
+| [T6 Ecosystem](./theory/chapter-06-ecosystem.md) | [Ch4 Tools(MCP)](./ch04-tools.md) + [Ch8 Model](./ch07-model.md) | 前者讲框架/向量/标准生态，后者讲 MCP/Skill 与多 provider 抽象 |
+| [T7 Roadmap](./theory/chapter-07-roadmap.md) | [Ch12 路线](./ch10-roadmap.md) | 前者是理论驱动的 4 Phase，后者是源码驱动的四阶段实战（每周产出）；两份路线可并行使用 |
 
 ## 建议阅读顺序
 
@@ -50,4 +50,4 @@
 
 - 本书 Ch2 的六件套图与 Ch5 的"估算→预算→触发→压缩"链路，可作为 T1/T3 的配图补充
 - 本书 Ch13 的一页纸可作为 T7 的 30 分钟快查卡
-- 两卷现已同仓同构：同一 mdBook、同一 GitHub Pages、同一份审计日志（附录 D）——原独立仓库可归档
+- 两卷现已同仓同构：同一 VitePress 站点、同一 GitHub Pages 部署、同一份审计日志（附录 D）——原独立仓库可归档

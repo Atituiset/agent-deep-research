@@ -1,5 +1,7 @@
 # 第五章：行业趋势与岗位分析
 
+> **源码卷对位阅读**：本章（T5）对应源码卷 [第 13 章 一页纸速查](../ch09-one-pager.md) 与 [第 12 章 精深学习路径](../ch10-roadmap.md)——本章讲岗位信号与技能栈，源码卷给可直接背诵的要点与实战路径。
+
 ## Agent Memory作为独立工种的产业信号
 
 ### 核心信号：ByteDance的Agent Memory Infrastructure团队
@@ -160,3 +162,5 @@ JD要求的能力组合（LLM + Data Systems + Context Engineering）在市场�
 2. **Memory和Runtime是最先独立的两个子方向**
 3. **中国公司的需求量 > 美国公司（相对）** ——因为中国AI应用层创新更快，对Infra的需求更急迫（⚠️ 个人观察，未做数据验证）
 4. **供给严重不足**：横跨LLM + Infra + Context的人极少
+
+> **回到源码卷**：[第 13 章 一页纸速查](../ch09-one-pager.md) / [第 12 章 精深学习路径](../ch10-roadmap.md) 把本章的技能栈落到可背诵要点与实战产出。

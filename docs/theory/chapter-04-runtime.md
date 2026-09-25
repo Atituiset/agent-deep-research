@@ -1,5 +1,7 @@
 # 第四章：Agent Runtime 设计模式
 
+> **源码卷对位阅读**：本章（T4）对应源码卷 [第 3 章 Agent Loop 精读](../ch03-loop.md)、[第 4 章 Tool / 权限 / 沙箱](../ch04-tools.md) 与 [第 9 章 多 Agent 与任务规划](../ch08-multi-agent.md)——本章讲 FSM vs while 与 ReAct/Plan-Execute/Multi-Agent 三模式，源码卷给九家三层嵌套与显式规划容器。
+
 ## Agent Loop 的状态机分析
 
 ### 从"循环"到"状态机"
@@ -604,3 +606,5 @@ LLM 直接 plan + execute（混在一起）
 | Budget Control | 仅 Token 计数 | 增加 Cost Budget + 实时报告 | 中 |
 | Checkpoint | 无 | Hop-level Checkpoint for Recovery | 低 |
 | Death Spiral 检测 | 无 | Context 质量监控 + 提前终止 | 低 |
+
+> **回到源码卷**：[第 3 章 Agent Loop 精读](../ch03-loop.md) / [第 4 章 Tool / 权限 / 沙箱](../ch04-tools.md) / [第 9 章 多 Agent 与任务规划](../ch08-multi-agent.md) 给出九家 Runtime 的源码级实现。

@@ -21,7 +21,7 @@ Lab3-6               Lab7/10/11                多Agent/评测前沿
 2. **从最简到最强**：先读懂 Pi 的 200 行 `runLoop` 与 Qwen-Agent 的库形态（`agent.py:31`），再看 Claude/Codex 的生产增强——知道"哪些复杂度是本质的，哪些是工程债"。
 3. **以反例驱动**：每章的 `> 反例` 与失败案例优先于成功路径。能说清"为什么不行"才算懂了"为什么行"。
 4. **产出可验收**：每个 Stage 结束有硬性 checklist；不达标不进入下一阶段。
-5. **写作即学习**：Stage D 要求输出公开文章或书评——把七家对比讲给别人听，是检验理解的唯一标准。
+5. **写作即学习**：Stage D 要求输出公开文章或书评——把九家对比讲给别人听，是检验理解的唯一标准。
 
 ## 12.2 Stage A：奠基期（约 2 周）
 
@@ -31,7 +31,7 @@ Lab3-6               Lab7/10/11                多Agent/评测前沿
 |------|------|
 | 论文 | Attention Is All You Need (arXiv:1706.03762)；BPE/SentencePiece 原理；ReAct (arXiv:2210.03629) 只读 abstract+图1 建立 Loop 直觉 |
 | 源码 | Pi `packages/agent/src/{types,agent}.ts` 全读（≤300 行）；Qwen-Agent `qwen_agent/agent.py` 全读（269 行）——两种语言的最简形态 |
-| Lab | **Lab 1**：200 行 TS 最小闭环（Ch2.4 骨架，hop≤25，read/write/bash 三工具）；**Lab 2**：chars/4 vs tiktoken 误差表 + 20 轮对话成本模型（Ch5.2 数据可对照） |
+| Lab | **Lab 1**：200 行 TS 最小闭环（[Ch2.4](./ch02-common-model.md#_2-4-最小可用闭环-200-行心智模型) 骨架，hop≤25，read/write/bash 三工具）；**Lab 2**：chars/4 vs tiktoken 误差表 + 20 轮对话成本模型（[Ch5.2](./ch05-context.md#_5-2-原理-估算-→-预算-→-压缩-→-缓存) 数据可对照） |
 | 验收 | [ ] 能白板手写 runLoop 并指出 3 个闸的位置；[ ] 能解释 Qwen-Agent 为何 deepcopy messages（`agent.py:91`）；[ ] 成本模型误差 <20% |
 
 **常见坑**：直接上 Claude/Codex 源码会被三层嵌套劝退——务必先吃透两个"教学级"实现。
@@ -44,21 +44,21 @@ Lab3-6               Lab7/10/11                多Agent/评测前沿
 
 | 维度 | 内容 |
 |------|------|
-| 论文 | Reflexion (arXiv:2303.11366)；CodeAct (ICML 2024)；Toolformer (arXiv:2302.04761)；Gorilla (arXiv:2305.15334)；Function Calling 技术报告（OpenAI 2023-06 / Anthropic 2024）；MCP 规范（2024-11）。**先读本书逐篇精读建立框架**：Ch3 §3.1.2（Loop 六篇）、Ch4 §4.1.2（工具六篇），再回原文对照 |
+| 论文 | Reflexion (arXiv:2303.11366)；CodeAct (ICML 2024)；Toolformer (arXiv:2302.04761)；Gorilla (arXiv:2305.15334)；Function Calling 技术报告（OpenAI 2023-06 / Anthropic 2024）；MCP 规范（2024-11）。**先读本书逐篇精读建立框架**：[Ch3 §3.1.2](./ch03-loop.md#_3-1-2-逐篇精读-每篇论文如何-长出-一种-loop-形态)（Loop 六篇）、[Ch4 §4.1.2](./ch04-tools.md#_4-1-2-逐篇精读-工具能力的四次跃迁与一次协议化)（工具六篇），再回原文对照 |
 | 源码 | Claude `src/query.ts:219`（只看三层嵌套骨架）+ `src/Tool.ts:362`；Codex `turn.rs:153` 骨架 + `spec_plan.rs:117` build_tool_router；DeepSeek `inbox.ts` 打断语义；Qwen-Agent `fncall_agent.py:73` 计数器循环（对照组） |
-| Lab | **Lab 3**（Ch3）：while→FSM 改造 + Inbox.splice 打断；**Lab 4**（Ch4）：ToolExposure{Direct,Deferred} 分级 + 横切权限 |
+| Lab | **Lab 3**（[Ch3](./ch03-loop.md#lab-3-从-200-行到生产-loop)）：while→FSM 改造 + Inbox.splice 打断；**Lab 4**（[Ch4](./ch04-tools.md)）：ToolExposure{Direct,Deferred} 分级 + 横切权限 |
 | 验收 | [ ] 能画 DeepSeek Phase 状态机并说出 wakingAfterAbort 解决什么；(2) 能解释 Codex 每 StepContext 重建 ToolRouter 的动机；(3) Lab4 首轮 schema tokens 下降 >50% |
 
 ### Week 5–6: Context 与 Memory
 
 | 维度 | 内容 |
 |------|------|
-| 论文 | Lost in the Middle (arXiv:2307.03172)；RULER (arXiv:2404.06654)；MemGPT (arXiv:2310.08560)；A-MEM (NeurIPS 2025)；FadeMem (2026)；Prompt Caching 技术博客（Anthropic 2024-08）。精读入口：Ch5 §5.1.3、Ch6 §6.1.3（含 MemGPT/A-MEM 核心图复述） |
+| 论文 | Lost in the Middle (arXiv:2307.03172)；RULER (arXiv:2404.06654)；MemGPT (arXiv:2310.08560)；A-MEM (NeurIPS 2025)；FadeMem (2026)；Prompt Caching 技术博客（Anthropic 2024-08）。精读入口：[Ch5 §5.1.3](./ch05-context.md#_5-1-3-反思-lost-in-the-middle-与长上下文幻觉)、[Ch6 §6.1.3](./ch05b-memory.md#_6-1-3-三篇里程碑的-核心图复述)（含 MemGPT/A-MEM 核心图复述） |
 | 源码 | Claude `autoCompact.ts:62` + `compact.ts:387` 四层防线全读；Grok `compaction.rs` CompactionPolicy + two_pass；Codex `context_manager/history.rs:93` for_prompt 投影；Qwen-Agent `memory/memory.py:32` RAG-as-Memory（对照范式） |
-| Lab | **Lab 5**（Ch5）：chars/4 + window-13K 触发 + 结构化摘要；**Lab M**（Ch6）：120 行最小 Zettelkasten（Note/Link/Evolution/Retrieve 四阶段 + 衰减函数） |
+| Lab | **Lab 5**（[Ch5](./ch05-context.md)）：chars/4 + window-13K 触发 + 结构化摘要；**Lab M**（[Ch6](./ch05b-memory.md#lab-实现最小-zettelkasten-note-link-retrieval-约-120-行-ts)）：120 行最小 Zettelkasten（Note/Link/Evolution/Retrieve 四阶段 + 衰减函数） |
 | 验收 | [ ] 能推导 T=W-R-B 并算出 Opus 200K 的三档阈值；(2) 能复述四层压缩各自删什么、为什么顺序不可换；(3) Zettelkasten demo 能演示"写入时建链"与检索增益 |
 
-**常见坑**：Memory 章的论文容易读成综述笔记——强制自己给每个范式写一句"它在八家里对应的代码在哪"，对不上就说明没懂。
+**常见坑**：Memory 章的论文容易读成综述笔记——强制自己给每个范式写一句"它在九家里对应的代码在哪"，对不上就说明没懂。
 
 ## 12.4 Stage C：生产化期（约 4 周）
 
@@ -70,35 +70,35 @@ Lab3-6               Lab7/10/11                多Agent/评测前沿
 |------|------|
 | 论文/经典 | Event Sourcing (Fowler 2005)；Dapper (2010)；设计数据密集型应用 Ch3/Ch7（WAL/CRDT 选读）；Redux 时间旅行调试思想 |
 | 源码 | Grok `xai-chat-state/src/persistence.rs` + journal 双轨；Claude `sessionStorage.ts` 预写+防抖+逆序读；OpenCode `session.ts:693` fork idMap；Pi storage 包 branch/navigation |
-| Lab | **Lab 7**（Ch7）：append-only Session + kill -9 恢复 + repair + fork |
+| Lab | **Lab 7**（[Ch7](./ch06-session.md#lab-7-最小-append-only-session-约-120-行-ts)）：append-only Session + kill -9 恢复 + repair + fork |
 | 验收 | [ ] 三种 turn 边界方案能各自说一个失效场景；(2) Lab7 通过全部三项验收含崩溃恢复 |
 
 ### Week 9: 可观测与评测
 
 | 维度 | 内容 |
 |------|------|
-| 论文 | SWE-bench (arXiv:2310.06770)；Tau-bench (arXiv:2406.12045)；MT-Bench LLM-as-Judge (arXiv:2306.05685)；Process Reward (Math-Shepherd arXiv:2312.08935)。精读入口：Ch10 §10.1（Dapper 三招 + 五大基准逐篇） |
+| 论文 | SWE-bench (arXiv:2310.06770)；Tau-bench (arXiv:2406.12045)；MT-Bench LLM-as-Judge (arXiv:2306.05685)；Process Reward (Math-Shepherd arXiv:2312.08935)。精读入口：[Ch10 §10.1](./ch09-observability.md#_10-1-历史脉络与论文-lineage)（Dapper 三招 + 五大基准逐篇） |
 | 源码 | Codex e2e/benchmark 目录结构；Claude promptCacheBreakDetection 思路；Grok UsageLedger live/cumulative 分账 |
-| Lab | **Lab 10**（Ch10）：三层 Trace + 成本分账 + cache_break 告警 |
+| Lab | **Lab 10**（[Ch10](./ch09-observability.md#lab-10-给最小-agent-补上-trace-成本分账-约-100-行-ts)）：三层 Trace + 成本分账 + cache_break 告警 |
 | 验收 | [ ] 能列出 trace 最小完备集并各配一个事故模式；(2) 成本突增排查路径演练通过 |
 
 ### Week 10: 安全与自愈
 
 | 维度 | 内容 |
 |------|------|
-| 论文/标准 | Ignore Previous Prompt (arXiv:2211.09527)；Indirect PI (arXiv:2302.12173)；OWASP LLM Top10 v2(2024-11)；《Release It!》熔断器章节。精读入口：Ch11 §11.1（沙箱五十年 + 注入四篇逐篇） |
+| 论文/标准 | Ignore Previous Prompt (arXiv:2211.09527)；Indirect PI (arXiv:2302.12173)；OWASP LLM Top10 v2(2024-11)；《Release It!》熔断器章节。精读入口：[Ch11 §11.1](./ch10-reliability.md#_11-1-历史脉络与论文-lineage)（沙箱五十年 + 注入四篇逐篇） |
 | 源码 | Codex linux-sandbox + arg0 分发；Grok SENT_BEARER_PREFIX_LEN=12 全链路；Claude 反调试细节；Claw conversation.rs 内联 authorize（反面对照）；Qwen-Agent `_call_tool` 异常转消息（软自愈） |
-| Lab | **Lab 11**（Ch11）：Gatekeeper 权限层 + DISPOSITION 处置表 + 启动自愈 |
+| Lab | **Lab 11**（[Ch11](./ch10-reliability.md#lab-11-权限层-失败归一-启动自愈-约-130-行-ts)）：Gatekeeper 权限层 + DISPOSITION 处置表 + 启动自愈 |
 | 验收 | [ ] 注入测试用例：webfetch 恶意页面 → deny 且有审计事件；(2) 429 重试间隔符合 retryAfterMs |
 
 ## 12.5 Stage D：前沿与产出期（持续）
 
 **目标**：形成自己的技术观点并公开输出；跟踪三个前沿信号。
 
-1. **多 Agent 实战**（Week 11+）：读 CAMEL/MetaGPT/AutoGen lineage（逐篇精读见 Ch9 §9.1.2，实证清算与拓扑选型见 Ch9 §9.1.2 末节 + §9.1.4）→ 完成 **Lab 9**（Ch9.6）：TodoWrite + 单子 Agent → Orchestrator-Worker → worktree 并行写验证无冲突；
+1. **多 Agent 实战**（Week 11+）：读 CAMEL/MetaGPT/AutoGen lineage（逐篇精读见 [Ch9 §9.1.2](./ch08-multi-agent.md#_9-1-2-逐篇精读-多-agent-的五次形态变化与一次实证清算)，实证清算与拓扑选型见 [Ch9 §9.1.2](./ch08-multi-agent.md#_9-1-2-逐篇精读-多-agent-的五次形态变化与一次实证清算) 末节 + [§9.1.4](./ch08-multi-agent.md#_9-1-4-编排拓扑-lineage-三种范式的分化)）→ 完成 **Lab 9**（[Ch9.6](./ch08-multi-agent.md#_9-6-lab-从单-agent-到-orchestrator-worker-的渐进实现)）：TodoWrite + 单子 Agent → Orchestrator-Worker → worktree 并行写验证无冲突；
 2. **Capstone 二选一**：
-   - **工程向**：把 Lab1–11 整合为一个开源 mini-agent（目标 2000 行内），README 里用本书的六件套模型讲解设计；
-   - **研究向**：选一个未来方向（Ch5b.5 Federated Memory / Ch11.5 Policy-as-code），写一篇带实验的深度文章；
+   - **工程向**：把 Lab1–11 整合为一个开源 mini-agent（目标 2000 行内），README 里用本书的[六件套模型](./ch02-common-model.md)讲解设计；
+   - **研究向**：选一个未来方向（[Ch6 §6.5 Federated Memory](./ch05b-memory.md) / [Ch11.5 Policy-as-code](./ch10-reliability.md#_11-5-未来方向)），写一篇带实验的深度文章；
 3. **跟踪信号清单**（每月 30 分钟）：memorywire 标准进展、OTel GenAI 语义约定、各家 release notes 中 compact/subagent 相关变更；
 4. **验收**：[ ] 公开输出 ≥1 篇长文并获得有效反馈；(2) mini-agent 或研究文章可被陌生人独立跑通/读完。
 
@@ -106,16 +106,16 @@ Lab3-6               Lab7/10/11                多Agent/评测前沿
 
 | Lab | 章节 | 依赖 | 核心能力 |
 |-----|------|------|---------|
-| Lab 1 最小闭环 | Ch2.4 | — | 六件套体感 |
-| Lab 2 成本模型 | Ch5.2 | Lab1 | token 经济学 |
-| Lab 3 FSM+Inbox | Ch3 | Lab1 | 循环与打断 |
-| Lab 4 工具分级 | Ch4 | Lab1 | schema 预算/权限横切 |
-| Lab 5 压缩管线 | Ch5 | Lab2 | 四层防线 |
-| Lab M Zettelkasten | Ch6 | Lab5 | 写入时代理记忆 |
-| Lab 7 Session | Ch7 | Lab1 | 可重放/自愈/fork |
-| Lab 9 Orchestrator | Ch9 | Lab3/4 | 多 Agent 编排 |
-| Lab 10 Trace 分账 | Ch10 | Lab7 | 可观测/成本归因 |
-| Lab 11 安全三件套 | Ch11 | Lab4/7 | 权限/归一/自愈 |
+| Lab 1 最小闭环 | [Ch2.4](./ch02-common-model.md#_2-4-最小可用闭环-200-行心智模型) | — | 六件套体感 |
+| Lab 2 成本模型 | [Ch5.2](./ch05-context.md#_5-2-原理-估算-→-预算-→-压缩-→-缓存) | Lab1 | token 经济学 |
+| Lab 3 FSM+Inbox | [Ch3](./ch03-loop.md#lab-3-从-200-行到生产-loop) | Lab1 | 循环与打断 |
+| Lab 4 带 schema 校验的 Tool Router | [Ch4](./ch04-tools.md#lab-4-实现一个带-schema-校验的-tool-router) | Lab1 | 同源 schema/可见性分级/权限横切 |
+| Lab 5 压缩管线 | [Ch5](./ch05-context.md) | Lab2 | 四层防线 |
+| Lab M Zettelkasten | [Ch6](./ch05b-memory.md#lab-实现最小-zettelkasten-note-link-retrieval-约-120-行-ts) | Lab5 | 写入时代理记忆 |
+| Lab 7 Session | [Ch7](./ch06-session.md#lab-7-最小-append-only-session-约-120-行-ts) | Lab1 | 可重放/自愈/fork |
+| Lab 9 Orchestrator | [Ch9](./ch08-multi-agent.md#_9-6-lab-从单-agent-到-orchestrator-worker-的渐进实现) | Lab3/4 | 多 Agent 编排 |
+| Lab 10 Trace 分账 | [Ch10](./ch09-observability.md#lab-10-给最小-agent-补上-trace-成本分账-约-100-行-ts) | Lab7 | 可观测/成本归因 |
+| Lab 11 安全三件套 | [Ch11](./ch10-reliability.md#lab-11-权限层-失败归一-启动自愈-约-130-行-ts) | Lab4/7 | 权限/归一/自愈 |
 
 依赖关系决定了推荐顺序：A(Lab1-2) → B(Lab3→4→5→M) → C(Lab7→10→11) → D(Lab9→Capstone)。
 

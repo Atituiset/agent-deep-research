@@ -1,6 +1,8 @@
 # 第4章 Tool / 权限 / 沙箱
 
-> 如果说 Loop 是心脏，Tools 就是四肢。七家的 Tool 系统表面都是"读/写/查/跑 shell"，分水岭在**可见性、审批、沙箱与并行**。本章把这一层彻底剖开：从 Toolformer 到 MCP 的四年演进，为什么"规格与执行必须同源"，如何用可见性分级把首轮 token 压到 1/5，再用横切权限与沙箱把副作用关进笼子，最后用九家源码对证给出选型答案。
+> 回到统摄公式 **`Agent = Model + Harness`**（[Ch1](./ch01-landscape.md)）：Model 只负责"决定调用哪个工具、传什么参"，其余一切——工具如何描述、谁能调、在哪执行、结果如何回填——全是 Harness 的职责。在 [Ch2](./ch02-common-model.md) 的六件套中，本章负责的正是 **Tools** 这一件，它也是不变量 I2（`Prompt 与 ToolSpecs 同快照`）的主要承压面。
+
+> 如果说 Loop 是心脏，Tools 就是四肢。九家的 Tool 系统表面都是"读/写/查/跑 shell"，分水岭在**可见性、审批、沙箱与并行**。本章把这一层彻底剖开：从 Toolformer 到 MCP 的四年演进，为什么"规格与执行必须同源"，如何用可见性分级把首轮 token 压到 1/5，再用横切权限与沙箱把副作用关进笼子，最后用九家源码对证给出选型答案。
 
 ---
 
@@ -64,7 +66,7 @@ Tool 的本质是让自回归的"文本生成器"获得**可验证的副作用**
 
 **证据**：带 retriever 的 GPT-4 加 Gorilla 微调显著降低幻觉 API（编造模型名/参数）发生率，且当文档版本更新时表现稳健——模型学会了"以文档为准"。
 
-**遗产**：AST 评测成为后来一切工具基准的地基（BFCL 直接沿用）；"检索缩小候选集"预示了今天的 Tool Search 与 `defer_loading`（Ch4.2.2 可见性分级）——**工具清单不必全量注入，按需检索加载**正是 Groilla 思想的产品化。
+**遗产**：AST 评测成为后来一切工具基准的地基（BFCL 直接沿用）；"检索缩小候选集"预示了今天的 Tool Search 与 `defer_loading`（[Ch4.2.2 可见性分级](#_4-2-2-支柱二-可见性分级-toolexposure-—-首轮-token-预算的生死线)）——**工具清单不必全量注入，按需检索加载**正是 Groilla 思想的产品化。
 
 #### Function Calling (2023-06, OpenAI)：不是论文的论文——协议化的分水岭
 
@@ -92,7 +94,7 @@ Berkeley Function Calling Leaderboard 把前几年的散装评测收拢为持续
 
 **证据与采纳**：Anthropic 发布数月内 OpenAI（2025-03）与 Google DeepMind（2025-04）相继宣布支持，本书九家除 Pi 外均原生接入——一个社区协议在一年内成为跨厂事实标准，这在 LLM 生态里是首次。
 
-**遗产**：MCP 把权限问题推到了协议层（server 声明的能力边界、host 侧的审批策略如何叠加，见 4.2.3 权限横切），也带来了新的攻击面（恶意 server 描述注入，见 Ch11 注入线）。它是"工具生态化"的分水岭：此前的竞争在"有没有工具"，之后的竞争在"怎么管理工具"——可见性、审批、沙箱，正是本章后面五根支柱的主场。
+**遗产**：MCP 把权限问题推到了协议层（server 声明的能力边界、host 侧的审批策略如何叠加，见 4.2.3 权限横切），也带来了新的攻击面（恶意 server 描述注入，见 [Ch11](./ch10-reliability.md) 注入线）。它是"工具生态化"的分水岭：此前的竞争在"有没有工具"，之后的竞争在"怎么管理工具"——可见性、审批、沙箱，正是本章后面五根支柱的主场。
 
 ### 4.1.3 三条论文 Lineage 的会合
 
@@ -252,7 +254,7 @@ def load_tool_snapshot(yaml_path):
 
 ```
 设模型窗口 W = 200K, 系统提示 S = 8K, 用户输入 U = 2K, 保留输出 R = 8K
-则工具描述可用预算 B = W - S - U - R - 历史 ≈ 20K (真实值见 Ch5)
+则工具描述可用预算 B = W - S - U - R - 历史 ≈ 20K (真实值见 [Ch5](./ch05-context.md))
 
 若有 N=40 个工具，平均每个工具描述 D=600 tokens，则全量暴露成本 = N*D = 24K > B
 → 首轮即超预算，触发 PTL (Prompt Too Long) 或被迫截断历史
@@ -333,6 +335,8 @@ function validateToolCall(call: ToolCall, snapshot: string[]): boolean {
 }
 ```
 
+> **模式认领**：`build_tool_router()` 每轮产出的是注册表的**投影**而非改写——全量 `allTools` 本身不变，`model_visible_specs` 只是本轮可见视图，即本书所称的「**投影而非改写**」模式（`codex-rs/core/src/tools/spec_plan.rs:117`）。分级后的工具集也由此天然分成两组：Direct 是常驻可见的边界集，Deferred 存根是按需激活的保留集——即「**边界集与保留集**」模式（`codex-rs/tools/src/tool_spec.rs:22`）。
+
 **预算对比（实测估算，`chars/4`）：**
 
 | 策略 | 首轮可见工具数 | 首轮工具 token | 节省 | 代价 |
@@ -342,6 +346,8 @@ function validateToolCall(call: ToolCall, snapshot: string[]): boolean {
 | Claude `defer_loading` (6 Direct + 懒加载) | 6 | ~3,600 | **85%** | 首次调用某类工具多一 hop |
 
 > **30 秒陈述**："可见性分级的本质是**用一次额外的 LLM 往返换首轮预算**。当 N>15 时必做；N<10 时 Direct 即可，过度分级反而增加延迟。"
+
+> 换个说法：首轮全量 schema 的 token 开销是 Harness 对每次采样征收的固定税，分级暴露即本书所称的「**最小 Harness 税**」原则——只为本轮真正可见的工具付税，检索激活的那一次额外往返就是税率本身（`src/tools.ts:194 getAllBaseTools()` 的分区 + `codex-rs/tools/src/tool_spec.rs:22` 的四级枚举）。
 
 ### 4.2.3 支柱三：权限是横切面 (Cross-Cutting Permission)
 
@@ -360,7 +366,7 @@ async function bash(args) {
 // 新增工具时易忘加检查 → 提权漏洞
 ```
 
-**正模式：编排器统一拦截（七家一致）**
+**正模式：编排器统一拦截（九家一致）**
 
 ```
 用户输入 → Loop
@@ -523,6 +529,8 @@ Model                Orchestrator           Permission          SandboxManager  
 // 若仅靠权限字符串匹配 "write": "ask"，而无沙箱的 mount 隔离，
 // 用户误点"允许"即造成宿主机提权。
 // 正解：沙箱层 --ro-bind 将宿主机 /etc 以只读挂载，即使权限放行也无法写入
+// ——沙箱即权限失守后的「故障边界」：审批层被突破时，爆炸半径仍被关进 mount namespace
+// （codex-rs/core/src/tools/sandboxing.rs / Claude SandboxManager）
 ```
 
 ### 4.2.5 支柱五：并行正确性 (isConcurrencySafe)
@@ -626,6 +634,8 @@ interface AgentLoopConfig {
 | **MCP/Skill** | `src/services/mcp/client.ts` + `MCPServerConnection` (首家完整) | `mcp_tool_exposure.rs` + `ResponsesApiNamespace` | `SkillInfo` + `list_skills_with_plugins` | `packages/opencode/src/mcp/` + `plugin` 包 | `pi-extension-*` | `dsh-mcp-client` + `dsh-skill` + `Cordis` | 规划中 |
 | **截断** | `toolOrchestration.ts` 末端头尾保留 | `AnyToolResult.into_response()` | `estimate_item_tokens` 含 `tool_calls` | `tool/truncate.ts:Truncate.wrap()` 统一截断 | `transformContext` 层 | `tool_result` 归一 | 无 |
 
+> **注记**：本表实列七家。**Qwen-Agent**（库形态对照组）在 Tools 层走 `TOOL_REGISTRY` 注册制、无沙箱无权限（信任宿主），其锚点与"库 vs 产品"分水岭另有专门处理——见 [附录 B](./appendix-sources.md) Qwen-Agent 节（`qwen_agent/tools/base.py:24`）与 [Ch14 §14.2](./ch14-harness-philosophy.md) 九家定位矩阵；**Hermes** 的差异集中在 Memory/Context 引擎一侧，见 [Ch6 Memory](./ch05b-memory.md)。两家均不编造入列。
+
 ### 4.3.2 分家精读
 
 **Claude Code — 最激进的"悲观正确性" (`src/Tool.ts:362`, `src/tools.ts:194`)**
@@ -653,7 +663,7 @@ export function getAllBaseTools(): Tool<any, any>[] {
     toolSearchTool,        // 可见性分级的钥匙：Deferred 工具的检索入口
   ];
 }
-// assembleToolPool() 按 localeCompare 分区排序 built-ins，保证 cache 断点稳定（见 Ch5）
+// assembleToolPool() 按 localeCompare 分区排序 built-ins，保证 cache 断点稳定（见 [Ch5](./ch05-context.md)）
 ```
 
 侧重：**宁可慢，不可错**。30+ 工具默认串行，仅 `read_file/grep/glob` 等显式标记 `isConcurrencySafe` 的才并行。`ToolSearchTool` 是 Deferred 懒加载的显式入口，模型需先调 `tool_search(query="git")` 才能看到 `git_*` 工具簇。
@@ -774,7 +784,7 @@ dsh-skill      ─┘         ├─► waterfall 'agent/pre-step' (权限决策
                           └─► session-projection-cache (上下文投影)
 ```
 
-每个工具是独立 npm 包，通过 `Cordis` 服务依赖注入组合。`Inbox` 的 `next-step vs next-turn` 精确打断语义是七家中最细的（见 Ch3）。`dsh-tool-bash/bashing-persistent/pwsh` 提供多 shell 后端，适配 Windows/Linux。
+每个工具是独立 npm 包，通过 `Cordis` 服务依赖注入组合。`Inbox` 的 `next-step vs next-turn` 精确打断语义是九家中最细的（见 [Ch3](./ch03-loop.md)）。`dsh-tool-bash/bashing-persistent/pwsh` 提供多 shell 后端，适配 Windows/Linux。
 
 **Claw — 桥梁价值的"移植中" (`src/tools.py:24 load_tool_snapshot()`)**
 
@@ -791,7 +801,7 @@ impl ToolPool {
 
 侧重：**看"TS 思想如何翻译成 Rust"**。早期 `load_tool_snapshot` 仅做名字过滤是反例，正被 `ToolPool` 的同源设计修正。`compact_after_turns=12` 的固定轮数触发是原型级，已被其他家的 token 预算驱动取代。
 
-### 4.3.3 七家分野的本质
+### 4.3.3 九家分野的本质
 
 ```
 同源强度：  Codex(编译期) > Claude/OpenCode(运行时 Zod) > Grok(bridge 合并) > Pi(松散) > Claw(移植中)
@@ -959,7 +969,7 @@ MCP 三原语（Anthropic 规范）:
     └─ 未来：与 Tool 联动的"工具感知提示词"
 ```
 
-**未解之题**：MCP 当前的 `stdio` 传输假设工具与 Agent 同机，`SSE` 假设短连。长运行工具（如 `bash(npm run build)` 需 5 分钟）的**流式进度**与**中途取消**尚未标准化，七家中仅 Grok 的 `SamplingClient` 与 Codex 的 `ToolCallRuntime` 自行实现了取消令牌。
+**未解之题**：MCP 当前的 `stdio` 传输假设工具与 Agent 同机，`SSE` 假设短连。长运行工具（如 `bash(npm run build)` 需 5 分钟）的**流式进度**与**中途取消**尚未标准化，九家中仅 Grok 的 `SamplingClient` 与 Codex 的 `ToolCallRuntime` 自行实现了取消令牌。
 
 ### 4.5.2 Tool Registry Federation：从单注册表到联邦
 
@@ -1076,9 +1086,60 @@ require_approval if { regex.match("rm -rf", input.args.command) }
 - [ ] 能画出权限晶格（Deny > Ask > Allow）与 Orchestrator 横切拦截时序
 - [ ] 能画出 bwrap 沙箱时序（审批→沙箱决策→bwrap fork→执行→截断→回填）并区分 bwrap/worktree/gVisor 的隔离粒度
 - [ ] 能说清 `isConcurrencySafe` 为什么默认 false，以及 `preflight 串行 + 执行分桶 + 顺序回填` 的三段式并行正确性
-- [ ] 能按七家源码锚点（`Tool.ts:362 / tools.ts:194 / spec_plan.rs:117 / bridge.rs / tool.ts:30 / types.ts / Cordis`）对比同源、可见性、权限、沙箱、并行五维
+- [ ] 能按九家源码锚点（`Tool.ts:362 / tools.ts:194 / spec_plan.rs:117 / bridge.rs / tool.ts:30 / types.ts / Cordis`）对比同源、可见性、权限、沙箱、并行五维
 - [ ] 能按"工具数 N × 描述长度"阈值决策 Direct vs Deferred，按"是否为副作用"决策串行 vs 并行，按"单次执行 vs 会话隔离"决策 bwrap vs worktree
 - [ ] 能展望 MCP 标准化、Registry Federation、Auto-discovered Tools、Policy-as-Code 四个未来方向
 
-> 下一章看"工具执行完往哪放"——Context / Memory / Compaction 的预算、压缩与投影。
+回扣统摄公式：`Agent = Model + Harness` 中，Model 侧只产出一段结构化的 `tool_calls` JSON；而"这段 JSON 是否同源、是否可见、是否被审批、是否在沙箱里执行、能否并行"——本章五根支柱覆盖的全部决策——都在 Harness 侧，是你可以掌控、也必须掌控的部分。Tools 这件做扎实了，六件套的其余五件才有可信的执行面。
+
+---
+
+## 思考题
+
+> 以下 10 题按 ★（回忆/套用）、★★（分析/权衡）、★★★（综合/开放）分级，不设标准答案——能与源码锚点互证、能给出量化估算的论述即为合格。
+
+1. ★ **同源的定义**：为什么 Zod/trait 同源能在编译期或启动期消灭 schema 漂移，而"YAML 快照 + Python 执行"的手工同步不能？请用 Claw `src/tools.py:24` 的失败案例说明三类漂移故障各自在哪一层现形。
+2. ★ **首轮预算估算**：设 W=200K、S=8K、U=2K、R=8K、历史占用 150K，N=40 个工具、平均描述 600 tokens。全量 Direct 是否会首轮即 PTL？若改为 8 Direct + 32 Deferred 存根（每存根 20 tokens），首轮工具预算降到多少？
+3. ★ **权限晶格**：写出一份 ruleset，使 plan 模式下 `write` 被 deny、`read` 保持 allow、`bash(git status)` 放行而 `bash(rm *)` 拒绝，并说明 `Deny > Ask > Allow` 与"细粒度优先"两条合并规则各自的介入点。
+4. ★★ **悬垂工具调用**：若 `buildToolRouter()` 不在每个 StepContext 重建而是跨轮复用，请构造一个具体时序（含 MCP server 中途断开或 Deferred 工具被卸载）使模型产生 dangling tool call，并说明快照校验与 `repair_dangling_tool_calls` 各自的代价。
+5. ★★ **分级的税率**：可见性分级用一次额外 LLM 往返换首轮预算。在什么工具数 N 与任务类型分布下，这笔"税"会倒挂（即分级后的总延迟/总 token 反而高于全量 Direct）？给出量化边界。
+6. ★★ **截断的归属**：OpenCode 把截断做在工具层（`Truncate.wrap()`），Claude 做在 orchestration 末端头尾保留。哪种归属更能防止"某工具漏截断导致 context 爆炸"？对 MCP 动态注入的工具，两种方案各自的盲区是什么？
+7. ★★★ **并行正确性的证明**："`isReadOnly ⇒ isConcurrencySafe`"是否成立？请给出成立所需的额外前提（如文件系统语义、缓存一致性），或举出一个只读但不可并行的反例工具。
+8. ★★★ **沙箱组合选型**：一个"本地 CLI + 3 个并行 subagent + 高频 bash"的 Agent，如何在 bwrap / worktree / gVisor 中组合？请用启动成本（10ms / 50-100ms / 100ms+）与隔离对象（单次执行 / 会话文件集 / syscall）两维论证，并指出失败案例 4 在你的方案中如何被消解。
+9. ★★★ **MCP 的攻击面**：一个恶意 MCP server 能否通过精心构造的 `list_tools` 描述文本，穿过可见性分级直接污染首轮 prompt？权限晶格（Deny > Ask > Allow）能否拦截这类"描述注入"？（衔接 [Ch11](./ch10-reliability.md) 注入线。）
+10. ★★★ **Policy-as-Code 的边界**：把 4.2.3 的 ruleset 改写成 4.5.4 的 Rego 风格策略后，哪类规则最难表达（提示：考虑"该工具在过去 5 分钟内是否已被批准过同类操作"这类带状态的策略）？这暴露了静态规则表与策略引擎各自的什么极限？
+
+## Lab 4：实现一个带 schema 校验的 Tool Router
+
+**目标**：在 `my-agent` 的工具层实现同源注册表 + 四级可见性 + 横切权限 + 并行分桶，对齐 Codex `build_tool_router()`（`codex-rs/core/src/tools/spec_plan.rs:117`）的每轮重建语义，最终得到与 Claude/Codex 对等的 Tool 子系统骨架。
+
+**前置**：`my-agent/src/tools.ts`（Lab 1 已有的 read/write/bash 三工具，散弹式 `if(allowed)` 检查）与 Codex `codex-rs/tools/src/tool_executor.rs:106 ToolExecutor` 源码。
+
+**步骤**：
+
+1. **同源注册表**：实现 `buildTool({name, description, parameters: Zod, execute, isReadOnly, isConcurrencySafe})`，用 `zodToJsonSchema(parameters)` 单源派生 LLM 可见 JSON Schema，消灭手写双份维护；执行入口复用同一 Zod 做运行时校验，校验失败回传结构化 `InvalidArgumentsError` 给模型自愈。
+2. **四级可见性**：实现 `ToolExposure{Direct, Deferred, CodeModeOnly, Hidden}` 与 `buildToolRouter(ctx)`——每个 StepContext 重建并 `finalize()` 冻结，产出 `model_visible_specs` 快照；Deferred 只注册 `name + one-liner` 存根，Hidden 永不进快照。
+3. **检索激活**：实现 `tool_search(query)` 工具，对 Deferred 集做关键词/语义检索，Top-5 `promoteToDirect`；校验所有入站 `tool_calls` 都在当前快照内，否则返回 `NoSuchToolError`。
+4. **横切权限**：实现 `decidePermission(toolCall, ruleset)`（`Deny > Ask > Allow`、细粒度优先、defaults/user/session 三层 merge），在 Orchestrator 统一拦截；**删除**三个工具内部的散弹式 `if(allowed)`。
+5. **并行分桶**：`preflight`（审批+沙箱决策）强制串行；`isReadOnly && isConcurrencySafe && allow` 进 safe 桶 `Promise.all` 并行，其余 unsafe 桶串行；结果按原始 `tool_call_id` 顺序回填。
+
+**验收**：
+
+- [ ] schema 校验同源：模型传 `{ timeout: 3.5 }`（schema 为 `int`）被 Zod 拒绝并回传结构化错误，而非静默 `parseInt` 截断；改 Zod 字段名后 LLM 可见 schema 同步变化，无需第二处改动
+- [ ] 首轮预算达标：30 工具（6 Direct + 24 Deferred 存根）的首轮 schema tokens 较全量 Direct 下降 >50%（与 [Ch12](./ch10-roadmap.md) Stage B 的 Lab4 验收口径一致）
+- [ ] 快照一致：调用 Hidden 或未激活的 Deferred 工具返回 `NoSuchToolError` 且不产生任何副作用；MCP server 中途断开后下一轮快照自动剔除其工具
+- [ ] 权限横切生效：新增第 31 个工具时**不改任何工具代码**即被 ruleset 的默认规则覆盖；`write` 在 session 级 deny 时，`ask` 弹窗不再出现
+- [ ] 并行正确：两个同路径 `write_file` 被分入 unsafe 桶串行执行；回填的 `tool_results` 顺序与模型下发的 `tool_calls` 顺序严格一致
+
+**常见坑**：
+
+- JSON Schema 手写与 Zod 双份维护 → 漂移重现；必须 `zodToJsonSchema` 单源派生，CI 加"快照 diff"测试。
+- `promoteToDirect` 激活后快照未冻结 → 同一轮内可见集变化，模型仍按旧存根的残缺 schema 传参。
+- `preflight` 并行 → 审批竞态：第一个弹窗未答时第二个工具已执行，"Ask" 语义被架空。
+- 回填按完成时间而非 `tool_call_id` 排序 → 上下文错位，模型把 A 工具的结果当成 B 的。
+- `isConcurrencySafe` 默认给了 `true` → 乐观并行导致同路径 `write_file` 丢失更新；默认值必须是 `false`（Claude `buildTool()` 的悲观默认）。
+
+---
+
+> [下一章](./ch05-context.md)看"工具执行完往哪放"——Context / Memory / Compaction 的预算、压缩与投影。
 

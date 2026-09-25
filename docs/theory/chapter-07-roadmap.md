@@ -1,5 +1,7 @@
 # 第七章：研究计划与学习路径
 
+> **源码卷对位阅读**：本章（T7）对应源码卷 [第 12 章 精深学习路径：四阶段动手路线](../ch10-roadmap.md)——本章是理论驱动的 4 Phase，源码卷是源码驱动的四阶段实战（每周产出），两份路线可并行使用。
+
 ## 设计原则
 
 在制定学习计划之前，先明确几条原则：
@@ -641,3 +643,5 @@ Week 4: Demo + 文档
 1. **Push vs Pull**：Researcher 的发现是主动 push 给 Writer，还是 Writer 在需要时 pull？
 2. **Memory 的"新鲜度"**：Writer 怎么知道 Researcher 的发现是否还是最新的？
 3. **Agent 之间的 Trust Model**：如果 Reviewer 对 Researcher 的可信度有疑虑，能否标记 Researcher 的 memory 为 "untrusted"？
+
+> **回到源码卷**：[第 12 章 精深学习路径：四阶段动手路线](../ch10-roadmap.md) 给出源码驱动的四阶段实战与每周产出。

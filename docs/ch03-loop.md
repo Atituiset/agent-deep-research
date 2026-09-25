@@ -2,6 +2,8 @@
 
 > Loop 是 Agent 的"心脏"，也是各家分歧最大的组件。所有可靠性增强——重试、限流、打断、压缩、预算——最终都要落到"采样→执行→回填"这一闭合上如何编排。看懂 Loop，就看懂了 Agent 的并发模型与失败模型。
 
+**挂回全书公式**：`Agent = Model + Harness`，而 Harness 的内部结构即 [Ch2](./ch02-common-model.md) 的六件套——Prompt / Loop / Tools / Context·Memory / Session·Trace / Model。本章负责其中的第二件 **Loop**：Model 只产出"采样一次"，Loop 把它编排成可持续的"采样→执行→回填"闭合，并叠加预算、重试、装配、打断、观测五道闸。
+
 **本章目标**：读完能（1）按时间轴说清 Loop 范式从 ReAct 到 CodeAct 的五次跃迁；（2）手写三层嵌套的形式化定义与 FSM 迁移表；（3）对照各家源码锚点逐行解释"为什么这样写，不这样写会怎样"；（4）在 while / FSM / Actor 三选一时给出权衡与代价；（5）对 Speculative Loop 等四个前沿方向提出可验证的取舍假设。
 
 **阅读方式**：配合 `appendix-sources.md` 的锚点表，建议左侧开源码、右侧读本章；每节后的 `> 反例` 与 `思考题` 用于自检是否"真懂"。
@@ -23,7 +25,7 @@ Loop 并非一开始就是"状态机"。它的演进是一条"从 Prompt 技巧 
 | 2024.05 | **SWE-agent** (Yang et al., arXiv:2405.15793) | **NeurIPS 2024** | `Thought → Action(单一 command) → Observation` 窄 Loop + ACI | 提出 **Agent-Computer Interface (ACI)**：把"可执行动作空间"收敛到`bash + editor`，证明 Loop 的**工具集设计比模型更影响成功率**；Loop 内不做并行工具调用 |
 | 2024.03 | **OpenHands** (原 OpenDevin, Xingyao Wang et al.) | arXiv 2407.16741, **ICLR 2025** submission | `EventStream(controller) → AgentDelegate → MicroAgent` 事件驱动 | 把 Loop **事件化**：所有输入均抽象为 `Event{source, message, timestamp}` 流，`Controller` 统一调度 `Agent/Tool`；首次系统化支持**多 Agent 委托**与人机共编 |
 | 2024.02 | **CodeAct** (Wang et al.) | **ICML 2024** | `Code as Action`：`think → exec(python) → observe` 单一代码执行 Loop | 统一动作空间为**可执行 Python**，Loop 的工具调用从"多 JSON schema"坍缩为"单一 `exec`"，大幅降低 schema 漂移与解析失败；启发后续 Claude Code / Codex 的"代码即工具"分支 |
-| 2024–2026 | **Claude Code / Codex / Grok / DeepSeek Harness / OpenCode / Pi / Claw** | 工业实现（本书七码） | 三层嵌套（见 3.2）+ 状态机/Actor + 取消语义 | 把学术 Loop **生产化**：叠加`采样重试 × 流式装配 × 预算闸 × 打断（steer/inbox）× 观测（trace/otel）`五类"闸" |
+| 2024–2026 | **Claude Code / Codex / Grok / DeepSeek Harness / OpenCode / Pi / Qwen-Agent / Claw / Hermes** | 工业实现（本书九家） | 三层嵌套（见 3.2）+ 状态机/Actor + 取消语义 | 把学术 Loop **生产化**：叠加`采样重试 × 流式装配 × 预算闸 × 打断（steer/inbox）× 观测（trace/otel）`五类"闸" |
 
 > **演进主线**：`Prompt 技巧（ReAct）→ 跨试次记忆（Reflexion）→ 终身技能库（Voyager）→ 可控执行（SWE-agent ACI / CodeAct 统一动作）→ 事件化与委托（OpenHands）→ 生产化三层嵌套 + 取消语义（各家 Harness）`。每一次跃迁都在回答：Loop 的边界往哪里扩、失败往哪里回填、谁有权在中途打断它。
 
@@ -39,7 +41,7 @@ Loop 并非一开始就是"状态机"。它的演进是一条"从 Prompt 技巧 
 
 **证据**：论文在四类任务上验证。最直观的是 ALFWorld 文字游戏（做家务）：ReAct 成功率 71%，而纯动作基线只有 45%——差距几乎全部来自"先想再动"避免了无效操作。更重要的是错误分析：CoT 的主要失败模式是**幻觉**（编造事实且无法自纠），而 ReAct 把这类错误压到了零头——因为 Observation 提供了外部接地，错了会被环境打脸。
 
-**遗产与局限**：今天所有 Agent 的 `messages[]` 里 `assistant(tool_call) / user(tool_result)` 的交替结构，就是 Thought-Act-Observation 的直系后代。但 ReAct 也留下了一个直到 Function Calling 出现才解决的问题：**文本协议太脆**。`Action:` 行靠正则解析，模型少个引号、多个换行就解析失败——这个痛点直接催生了 Ch4 的结构化工具调用。另外 ReAct 的 Loop 没有任何熔断：任务失败只能整条轨迹重来。
+**遗产与局限**：今天所有 Agent 的 `messages[]` 里 `assistant(tool_call) / user(tool_result)` 的交替结构，就是 Thought-Act-Observation 的直系后代。但 ReAct 也留下了一个直到 Function Calling 出现才解决的问题：**文本协议太脆**。`Action:` 行靠正则解析，模型少个引号、多个换行就解析失败——这个痛点直接催生了 [Ch4](./ch04-tools.md) 的结构化工具调用。另外 ReAct 的 Loop 没有任何熔断：任务失败只能整条轨迹重来。
 
 #### Reflexion (2023)：给 Loop 加"外层"——失败如何变成下一次的输入
 
@@ -59,11 +61,11 @@ Loop 并非一开始就是"状态机"。它的演进是一条"从 Prompt 技巧 
 
 **证据**：同样的 GPT-4，Voyager 解锁的独特物品数是此前最强方法（ReActXtra/AutoGPT 类）的 **3.3×**，移动距离 2.3×；并且能泛化到从未见过的世界实例与新任务——说明学到的是技能而非背题。
 
-**遗产与局限**：技能库是今天一切 "Skill 目录 / agentskills.io / defer_loading 工具"（Ch4 可见性分级、Ch9 技能系统）的思想源头——"能力以代码形式在外部累积"。局限：写入技能库的成本当时无人关心（Minecraft 不在乎 token），放到生产 Agent 里就必须回答"什么时候值得为一次使用写一个技能"，这个问题至今没有标准答案。
+**遗产与局限**：技能库是今天一切 "Skill 目录 / agentskills.io / defer_loading 工具"（[Ch4](./ch04-tools.md) 可见性分级、[Ch9](./ch08-multi-agent.md) 技能系统）的思想源头——"能力以代码形式在外部累积"。局限：写入技能库的成本当时无人关心（Minecraft 不在乎 token），放到生产 Agent 里就必须回答"什么时候值得为一次使用写一个技能"，这个问题至今没有标准答案。
 
 #### AutoGPT / BabyAGI (2023)：工程上的反面教材——失控的 while(true)
 
-严格说这两者不是论文，而是 2023 年春引爆 GitHub 的开源项目，但它们对 Loop 工程史的贡献不可替代：它们把 ReAct 式 prompt 循环直接接上 `while(true)`，让模型自主设定子目标、无限执行——然后**当众展示了失控长什么样**。没有 hop 上限，模型陷入循环烧钱；没有取消语义，用户唯一的停止手段是 Ctrl-C 杀进程；没有预算闸，一夜烧穿 API key 的帖子层出不穷。它们的价值恰恰是**负面的**：此后所有生产实现（本书七码）里的 MAX_HOPS=25、预算闸、打断语义，都是对这个教训的直接回应。"Agent 需要的不是更聪明的模型，而是一个能踩刹车的 Harness"——这句话就是 AutoGPT 用真金白银换来的。
+严格说这两者不是论文，而是 2023 年春引爆 GitHub 的开源项目，但它们对 Loop 工程史的贡献不可替代：它们把 ReAct 式 prompt 循环直接接上 `while(true)`，让模型自主设定子目标、无限执行——然后**当众展示了失控长什么样**。没有 hop 上限，模型陷入循环烧钱；没有取消语义，用户唯一的停止手段是 Ctrl-C 杀进程；没有预算闸，一夜烧穿 API key 的帖子层出不穷。它们的价值恰恰是**负面的**：此后所有生产实现（本书九家）里的 MAX_HOPS=25、预算闸、打断语义，都是对这个教训的直接回应。"Agent 需要的不是更聪明的模型，而是一个能踩刹车的 Harness"——这句话就是 AutoGPT 用真金白银换来的。
 
 #### SWE-agent (2024)：接口即变量——ACI 设计学
 
@@ -73,17 +75,17 @@ Loop 并非一开始就是"状态机"。它的演进是一条"从 Prompt 技巧 
 
 **证据**：发布时以 12.47% 刷新 SWE-bench 全测试集纪录。更有说服力的是消融：仅移除编辑护栏一项，成功率就掉好几个点；接口措辞的微调也能带来可观的波动——证明"成功率里相当一部分是接口设计挣来的，不是模型"。
 
-**遗产与局限**：这是"为模型而非人写工具文档"（Anthropic 工具写作指南）的学术源头，Claude/Codex 的 edit 工具至今保留"唯一精确匹配否则报错"的护栏，就是 ACI 论文的直接落地。局限：ACI 实验基于当时的 GPT-4，模型变强后部分脚手架贬值（Ch14 交锋 A 的"Bitter Lesson vs ACI"之争）——但"接口是需要设计的独立变量"这一命题本身已被永久确立。
+**遗产与局限**：这是"为模型而非人写工具文档"（Anthropic 工具写作指南）的学术源头，Claude/Codex 的 edit 工具至今保留"唯一精确匹配否则报错"的护栏，就是 ACI 论文的直接落地。局限：ACI 实验基于当时的 GPT-4，模型变强后部分脚手架贬值（[Ch14](./ch14-harness-philosophy.md) 交锋 A 的"Bitter Lesson vs ACI"之争）——但"接口是需要设计的独立变量"这一命题本身已被永久确立。
 
 #### CodeAct (2024)：动作空间坍缩——万物皆可 exec
 
-**困境**：Function Calling 之后，Agent 的动作空间是一堆 JSON schema：读文件一个 schema、搜索一个 schema……schema 一多就漂移（Ch4 的同源困境），模型要在几十种格式间切换，出错率随之上升；且工具之间传递中间结果必须经过上下文中转，多步计算笨拙。
+**困境**：Function Calling 之后，Agent 的动作空间是一堆 JSON schema：读文件一个 schema、搜索一个 schema……schema 一多就漂移（[Ch4](./ch04-tools.md) 的同源困境），模型要在几十种格式间切换，出错率随之上升；且工具之间传递中间结果必须经过上下文中转，多步计算笨拙。
 
 **机制**：CodeAct 的做法激进而简单：**把全部动作坍缩为一种——可执行的 Python 代码**。想读文件？`read(path)`；想批量处理？写个 for 循环。附带一个此前没人认真利用的红利：**解释器状态跨步保留**——第一步定义的变量第二步还在内存里，中间结果无需塞回上下文。训练侧构造 CodeActInstruct 数据集微调出 CodeActAgent，评测覆盖 MINT 与 VQA/表格数学等任务。
 
 **证据**：论文报告 CodeAct 在 MINT 任务成功率上相对传统 text/JSON 动作空间最高提升约 17%，VQA 与表格数学最高约 12%；即便不微调、纯 prompt 切换到 code action，多数场景也不劣于 JSON。工程体感更明显：解析失败率从一类常见错误趋近于零。
 
-**遗产与局限**：这是 Claude Code "Bash-first"、Codex 统一 exec、以及各家 code mode 的思想源头——工具数量爆炸时，与其管理 N 个 schema，不如给一个图灵完备的动作空间。局限同样清晰：自由代码意味着更大的破坏半径，沙箱与超时从"可选"变成"必选"（Ch4/Ch11 的沙箱线因此被加速）；且并非所有动作都适合代码表达（审批粒度变粗了）。
+**遗产与局限**：这是 Claude Code "Bash-first"、Codex 统一 exec、以及各家 code mode 的思想源头——工具数量爆炸时，与其管理 N 个 schema，不如给一个图灵完备的动作空间。局限同样清晰：自由代码意味着更大的破坏半径，沙箱与超时从"可选"变成"必选"（[Ch4](./ch04-tools.md)/[Ch11](./ch10-reliability.md) 的沙箱线因此被加速）；且并非所有动作都适合代码表达（审批粒度变粗了）。
 
 #### OpenHands (2024)：Loop 的"事件化"——从拥有者变为消费者
 
@@ -104,7 +106,7 @@ SWE-agent / CodeAct / OpenHands (2024)
   "怎么约束动作空间，让 Loop 可执行、可复现、可中断"
         │
         ▼
-生产级 Loop（2024–2026，本书七码）
+生产级 Loop（2024–2026，本书九家）
   "怎么在保持可中断的同时，保证流式、重试、预算、观测都不丢"
 ```
 
@@ -151,7 +153,7 @@ type StepResult =
  // I4 |Context| ≤ window - reserve → 否则触发 compaction 或 reactiveCompact
 ```
 
-单步（`step`）与整轮（`turn`）的区分是七家的最大共识：
+单步（`step`）与整轮（`turn`）的区分是九家的最大共识：
 
 ```
 turn  := 用户一次输入 → 直到模型不再产生 tool_calls（或被打断/熔断）
@@ -182,7 +184,7 @@ Loop(s0) =
 
 ### 3.2.2 三层嵌套：为何不是一层或两层
 
-七家对照后可提炼为**三层**（与 `src/ch03-loop.md` 原版一致，此处形式化）：
+九家对照后可提炼为**三层**（与 `src/ch03-loop.md` 原版一致，此处形式化）：
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -210,9 +212,9 @@ Loop(s0) =
 
 - 若只有 L1（Pi 的教学形态可近似）：`fetch once → parse once`，网络抖动即整 turn 失败；流式中途取消无法以块为粒度中断；只能"全量重试"，无法做`chunk → block`的增量装配。
 - 若只有 L1+L2（无 L3 装配器）：`tool_use delta` 会以不完整的 JSON 碎片进执行器，导致`InvalidArgumentsError`批量失败。Claude 的 `StreamingToolExecutor.addTool()` 与 DeepSeek 的 `BlockAssembler.push(chunk)` 正是为解决此问题。
-- 若 L2 与 L3 合并：重试策略无法区分"采样前失败"（可整体重试）与"流中失败"（需按已收 `chunkSeqs` 决定是否重放或截断）。DeepSeek 的 `sourceEventSeqs` 回溯与 Claude 的 `withheld` 扣留即依赖此分层。
+- 若 L2 与 L3 合并：重试策略无法区分"采样前失败"（可整体重试）与"流中失败"（需按已收 `chunkSeqs` 决定是否重放或截断）——这条"采样前 / 流中"的分界正是本书模式**「故障边界」**：故障在哪一层发生，就只在该层重试或升级，不越层扩散（锚点：DeepSeek `packages/core/agent-loop/src/agent.ts:70` 的 `step()` 内 `normalizeLlmFailure()` 归一后单 step 重试、不跨 turn）。DeepSeek 的 `sourceEventSeqs` 回溯与 Claude 的 `withheld` 扣留即依赖此分层。
 
-#### L2 的重试契约（七家归一后）
+#### L2 的重试契约（九家归一后）
 
 ```ts
 type LlmError = {
@@ -271,7 +273,7 @@ class BlockAssembler {
 }
 ```
 
-> 生产教训（Claw 的反例）：Claw `ApiClient::stream() → Vec<AssistantEvent>` 的**批量流**一次性返回整批事件，代码最短，但在 20+ hop 长链路上无法做到"边收边执行"与"中途取消"。因此七家生产级几乎一致选**增量流 + 装配器**。
+> 生产教训（Claw 的反例）：Claw `ApiClient::stream() → Vec<AssistantEvent>` 的**批量流**一次性返回整批事件，代码最短，但在 20+ hop 长链路上无法做到"边收边执行"与"中途取消"。因此九家生产级几乎一致选**增量流 + 装配器**。
 
 ### 3.2.3 状态机定义：从 `while(true)` 到 `Phase`
 
@@ -334,7 +336,7 @@ const transitions: Record<string, Phase['kind'][]> = {
 
 - `wakingAfterAbort`：若 `abort` 后紧接着 `wakeRequested`，则该 wake 是"abort 的副作用"，不应被归类为新的 `next-turn`，否则会凭空多起一轮 turn。
 - `turn_start_offset`（Grok `turn_capture.turn_start_offset`）：`idle → running` 时记录 `session.length`，`maintenance` 期间的所有追加均不计入当前 turn，便于崩溃后按 offset 重放而非逐条克隆。
-- `history_version`（Codex `context_manager/history.rs:93`）：每次 `Session.append` 递增，`for_prompt()` 消费时校验，确保"压缩不丢血缘"（3.5 节的投影语义）。
+- `history_version`（Codex `context_manager/history.rs:93`）：每次 `Session.append` 递增，`for_prompt()` 消费时校验，确保"压缩不丢血缘"——这是本书模式**「投影而非改写」**的实证：Context 永远是 append-only Session 的投影，压缩只改投影、不动全量（锚点：`codex-rs/core/src/context_manager/history.rs:93`；投影语义详述见 [Ch5](./ch05-context.md)）。
 
 #### 为何 Pi/Claude 仍用 `while`
 
@@ -349,7 +351,7 @@ const transitions: Record<string, Phase['kind'][]> = {
 
 ### 3.2.4 取消语义（Cancellation）：最难的并发问题
 
-用户在模型采样期间敲键盘输入，是 Loop 最难的并发问题。七家给出三档精度：
+用户在模型采样期间敲键盘输入，是 Loop 最难的并发问题。九家给出三档精度：
 
 #### 3.2.4.1 取消的两种语义
 
@@ -394,6 +396,8 @@ class Inbox {
 | Pi | `AgentLoopConfig.getSteeringMessages()/getFollowUpMessages()` 回调式 | 低：回调注入，无队列语义 | `packages/agent/src/agent-loop.ts:155 runLoop` |
 | Claude | `withheld` 扣留 + `StreamingToolExecutor.getCompletedResults()` 并行回吐 | 中高：工具结果与 steer 合并回填，`withheld` 保证不丢 | `src/query.ts:219` + `src/services/tools/` |
 | Grok | `ChatStateActor` 单 task 串行消费 `Command` | 高：Actor 串行天然无竞态，`Oneshot` 回执 | `crates/codegen/xai-chat-state/src/actor/mod.rs` |
+
+> 注：本表仅列五家代表；OpenCode、Claw 的取消/打断档位见 3.3.3 总表，Qwen-Agent（库形态对照组，见 [Ch4](./ch04-tools.md)）与 Hermes（见 [Ch6](./ch05b-memory.md)）两家补齐计划见附录。
 
 #### 3.2.4.3 取消的时序图（DeepSeek 语义，ASCII）
 
@@ -463,6 +467,8 @@ Claude 的 `StreamingToolExecutor` 进一步做到"工具边收边执行"：`add
 | **OpenCode** | `packages/opencode/src/session/session.ts:224 Info Schema` (Effect) | `tool/registry` 驱动 + `BundledSDK.languageModel` | `tool/tool.ts:50 execute(ctx: Effect)` | `Tool.Def{parameters,jsonSchema,execute:Effect}` + `PermissionV1.Ruleset` + `Truncate.wrap()` | `Agent.steps` + `agent/prompt/compaction.txt` 隐藏 agent | **Effect + 隐藏 agent** |
 | **Claw** | `rust/crates/runtime/src/conversation.rs:91 ConversationRuntime`（`run_turn()` :153） | `ApiClient::stream` | `build_assistant_message(events)` | `rust/crates/tools/src/lib.rs ToolPool` | `max_iterations` | **批量流（反例）** |
 | Hermes | `agent/conversation_loop.py:1766 run_conversation()`（单体式主循环；网关进程缓存 agent 实现跨 turn 复用；MoA/子代理经 async_delegation 并行） |
+
+> 注：本表未含 Qwen-Agent（库形态对照组，见 [Ch4](./ch04-tools.md)），补齐计划见附录。
 
 > 一句话区分：**最小闭环（Pi）只有外层与"工具后回填"；生产级（Claude/Codex/DeepSeek/Grok）在中/内层叠加了重试、流式工具累积、预算闸与取消语义**。
 
@@ -607,7 +613,7 @@ export async function runLoop(
 
 **精读点**：
 
-- **为何适合教学**：`runLoop` 无 `Session` 持久化、无 `BlockAssembler`、无 `Inbox` 队列，所有"闸"均通过 `AgentLoopConfig` 回调注入，读者可逐个替换实现以观察效果，是"200 行可运行的 Loop 实验室"。
+- **为何适合教学**：`runLoop` 无 `Session` 持久化、无 `BlockAssembler`、无 `Inbox` 队列，所有"闸"均通过 `AgentLoopConfig` 回调注入，读者可逐个替换实现以观察效果，是"200 行可运行的 Loop 实验室"——也是本书模式**「最小 Harness 税」**的正面样本：只为当前需求支付最低的 Harness 复杂度，税基为零、按需加闸（锚点：Pi `packages/agent/src/agent-loop.ts:155 runLoop`）。
 - **局限**：无 `TurnContext/StepContext` 二分，`tool_router` 在循环内不变，若回合中途切模型需重启整个 `runLoop`；无 `TurnCaptureState`，崩溃无法按 offset 重放。
 - **一句话陈述**："我能手写 Pi 的 `runLoop`，并指出生产级需在其上加的 5 个闸：预算、重试、装配、取消、观测。"
 
@@ -687,7 +693,7 @@ class ReactLoopAgent {
 
 - **`Phase` 三态是本书最精确的中断语义**：`idle` 可接受 `kick()`，`running` 可被 `steer(next-step)` 抢占，`maintenance` 仅可被 `cancel(keepInbox=false)` 打断。`wakingAfterAbort` 防重入是正确性关键（见 3.2.4.2 时序图）。
 - **`BlockAssembler` + `sourceEventSeqs`**：`chunkSeqs` 供 `turn/start` 回溯，若流中失败可按已收 seqs 决定重放或截断，是"流的可重放性"保证。
-- **`turnEnds=max-tokens` 的黏性**：`completed` 不覆盖 `max-tokens`，保证用量归因正确（`total_tokens` 重写为 live 长度，见 Ch2 的适配器剥除）。
+- **`turnEnds=max-tokens` 的黏性**：`completed` 不覆盖 `max-tokens`，保证用量归因正确（`total_tokens` 重写为 live 长度，见 [Ch2](./ch02-common-model.md) 的适配器剥除）。
 
 #### Grok — `xai-chat-state` Actor
 
@@ -793,7 +799,7 @@ export const Truncate = {
 **精读点**：
 
 - **Effect 的价值**：`Tool.Def.execute` 返回 `Effect`，`Session.Service` 亦为 `Effect`，两者在 `Effect.gen` 中组合时，`AbortSignal` 与错误归一自动传播，无需手写 `try/catch + abort` 样板。
-- **隐藏 compaction agent**（`agent/agent.ts:35 Info{mode:hidden, permission:* deny}`）：压缩由专用子 agent 执行（`compaction/title/summary` 三类，见 `agent/prompt/compaction.txt`），权限`* deny`保证不触文件，是"压缩即子 Agent"的干净隔离。
+- **隐藏 compaction agent**（`agent/agent.ts:35 Info{mode:hidden, permission:* deny}`）：压缩由专用子 agent 执行（`compaction/title/summary` 三类，见 `agent/prompt/compaction.txt`），权限`* deny`保证不触文件——本书模式**「边界集与保留集」**的实例：权限边界以"显式 allow 集 + 默认 deny 的保留集"表达（锚点：`packages/opencode/src/agent/agent.ts:35`），是"压缩即子 Agent"的干净隔离。
 - **统一截断**：`Truncate.wrap()` 在工具层统一做，而非散落在各工具内部，避免某工具绕过截断导致 context 爆炸（与 Claude `src/services/tools/toolOrchestration.ts` 末端截断同策，但 OpenCode 更彻底）。
 
 #### Claw — `rust/crates/runtime/src/conversation.rs:91 ConversationRuntime`（`run_turn()` :153）
@@ -831,7 +837,7 @@ impl ConversationRuntime {
 - **`compact_after_turns=12` 的粗糙**：固定轮数触发压缩，而非 token 预算驱动（Claude `effectiveWindow-13k` / Grok `85%`）。在"单轮输出 30K token 的长工具结果"场景，12 轮前已 PTL；在"短轮 20 turn"场景又过早压缩，浪费可缓存前缀。
 - **移植价值**：`claw-code-main/src/tools.py:24 load_tool_snapshot()` 展示如何把 TS 的 `Tool.Def` 翻译为 Rust 的 `ToolPool`，是"TS→Rust 移植"的桥梁案例。
 
-### 3.3.3 七家对证小结：一张"闸"的有无表
+### 3.3.3 九家对证小结：一张"闸"的有无表
 
 | 闸 | Claude | Codex | Pi | DeepSeek | Grok | OpenCode | Claw |
 |----|--------|-------|----|----------|------|----------|------|
@@ -842,7 +848,9 @@ impl ConversationRuntime {
 | **取消/打断** | ✅ `withheld` | ✅ `InputQueue` | △ 回调式 | ✅ `Inbox.splice` | ✅ `Actor` | △ `AbortSignal` | ❌ |
 | **观测** | ✅ `tengu_*` + `Trace` | ✅ `codex-otel` | △ 内存 | ✅ `EventV2Bridge` | ✅ `UsageLedger` | ✅ `Drizzle PartTable` | △ `Session.version` |
 
-> 结论：七家差异不在"有无 Loop"，而在"在 Loop 上装了几道闸、每道闸的精度"。Pi 只有 1 道（hop），Claw 2 道，生产级 5 道全装。
+> 注：本表未含 Qwen-Agent（库形态对照组，见 [Ch4](./ch04-tools.md)）与 Hermes（见 [Ch6](./ch05b-memory.md)），两家补齐计划见附录。
+
+> 结论：九家差异不在"有无 Loop"，而在"在 Loop 上装了几道闸、每道闸的精度"。Pi 只有 1 道（hop），Claw 2 道，生产级 5 道全装。
 
 ---
 
@@ -920,7 +928,7 @@ impl ConversationRuntime {
 **关键挑战**：
 
 - 推测策略：对`read_file`可推测"文件存在/不存在"各起一 speculative branch（类似 Grok 的 `forkSubagent` 冻结 `renderedSystemPrompt` 保证 cache 命中，推测分支亦可共享前缀 cache）。
-- 回滚代价：`Session.append` 为唯一写路径（I1），推测分支需写 `speculative: true` 的暂态事件，确认后 `commit` 或 `rollback`。DeepSeek 的 `turn_start_offset` 与 Grok 的 `Journal` 为此提供基础——offset 之前的共享前缀无需回滚。
+- 回滚代价：`Session.append` 为唯一写路径（I1）——本书模式**「只增不改」**（append-only 轨迹；锚点：Claude `src/query.ts:219` 的 `deps.session.append(...)`、Grok `turn_capture.turn_start_offset` 的 offset 重放）——推测分支需写 `speculative: true` 的暂态事件，确认后 `commit` 或 `rollback`。DeepSeek 的 `turn_start_offset` 与 Grok 的 `Journal` 为此提供基础——offset 之前的共享前缀无需回滚。
 - 适用场景：`read_file / list_dir` 等只读工具推测收益高；`write_file / bash` 等有副作用工具不可推测（需 `isConcurrencySafe` 判定）。
 
 **验收**：在 10 hop 链路上，推测命中率>60% 时端到端延迟下降>20%，且回滚正确性 100%（无推测污染进 `Session` 全量）。
@@ -942,7 +950,7 @@ impl ConversationRuntime {
 
 ### 3.5.3 Adaptive Hop Budget（自适应预算）
 
-**现状**：七家均为固定 `MAX_HOPS=25`（Claude/Pi/DeepSeek）或 `max_iterations`（Grok/Claw）。固定值在"简单问答 3 hop 即结束"时浪费判定开销，在"复杂重构需 40 hop"时过早熔断。
+**现状**：九家均为固定 `MAX_HOPS=25`（Claude/Pi/DeepSeek）或 `max_iterations`（Grok/Claw）。固定值在"简单问答 3 hop 即结束"时浪费判定开销，在"复杂重构需 40 hop"时过早熔断。
 
 **思路**：把 `hop budget` 从常量变为**基于任务复杂度与历史成功率的动态值**。
 
@@ -1061,6 +1069,8 @@ Session.append（唯一写路径，可重放）
 
 > "Loop 的本质是`采样→执行→回填`的闭合，工程是在闭合上加五道闸。教学用 Pi 的 200 行 `while` 能跑；生产需三层嵌套——外层 turn 控 hop 与结束判定，中层采样重试归一 `LlmError` 后指数退避，内层流消费用 `BlockAssembler/in_flight` 装配。`while / FSM / Actor` 三选一取决于是否需采样中打断与崩溃自愈：三问皆否则 `while`，需打断则 `FSM`（DeepSeek `Phase`），需自愈则 `Actor`（Grok `ChatStateActor`）。批量流（Claw `Vec<AssistantEvent>`）易写但不可取消与边收边执行，生产必选增量流。"
 
+**回扣全书公式**：在 `Agent = Model + Harness` 中，本章的 Loop 是把 Model 的"单次采样"变成"持续行动"的那一件；它与六件套其余各件的接缝——工具编排（[Ch4](./ch04-tools.md)）、预算与压缩（[Ch5](./ch05-context.md)）、`Session.append` 的可重放（[Ch7](./ch06-session.md)）、重试降级所依赖的模型抽象（[Ch8](./ch07-model.md)）——分别由后续章节展开。
+
 ---
 
 ## 思考题
@@ -1100,11 +1110,11 @@ Session.append（唯一写路径，可重放）
 
 ---
 
-> 下一章将把 Loop 体内的"工具编排"——审批、沙箱、可见性、并行与 MCP——逐行拆开。七家在此的分野比 Loop 更细：同一 `read_file`，在 Claude/Codex/OpenCode 中的权限判定路径完全不同。
+> 下一章将把 Loop 体内的"工具编排"——审批、沙箱、可见性、并行与 MCP——逐行拆开。九家在此的分野比 Loop 更细：同一 `read_file`，在 Claude/Codex/OpenCode 中的权限判定路径完全不同。
 
 
 
-## 3.8 技术审计实证注记（2026-08-23 校准）
+## 3.7 技术审计实证注记（2026-08-23 校准）
 
 以下锚点与机制均已对照本地源码逐条验证：
 

@@ -2,6 +2,8 @@
 
 > 九家实现表面差异很大，但剥开后都是同一套"六件套"在不同约束下的变形。本章先把这套模型**形式化**，再用反例说明"缺一件会怎样"，为后续精读打下坐标系。
 
+本书的统摄公式是 **Agent = Model + Harness**——本章的"六件套"正是 **Harness 的内部结构**。注意第六件 "Model" 指的不是 LLM 本身，而是 Harness 侧的**模型抽象/适配层**；公式右端的 Model（LLM）是被这六件围绕、调度与约束的外部依赖。
+
 ## 2.1 一句话定义与形式化
 
 **Agent = Prompt + Loop + Tools + Context + Session + Model**，六者缺一不可。形式化为状态机：
@@ -31,9 +33,9 @@ Loop  : State -> Model -> (ToolCalls | Text) -> Tools -> State'
 
 ### 为什么是六件，而不是四件或八件
 
-- 合并 `Prompt` 与 `Context`？不行。`Prompt` 是**指令**（System + 工具描述），`Context` 是**记忆**（历史消息 + 压缩产物），两者在缓存（`cache_control`）与压缩（`for_prompt`）上行为不同（Ch5）。
-- 合并 `Session` 与 `Context`？不行。`Session` 是**全量事实**（追加日志），`Context` 是**投影**（本次请求可见子集），`Session.fork()` 与 `Context.for_prompt()` 的语义正交（Ch7 vs Ch5）。
-- 拆出 `Memory` 为第七件？本书将 `Memory` 视为 `Context` 的**长期延伸**与 `Session` 的**索引层**（Ch6），单独立章但不单列为顶层件，避免与 `Context` 职责混淆。
+- 合并 `Prompt` 与 `Context`？不行。`Prompt` 是**指令**（System + 工具描述），`Context` 是**记忆**（历史消息 + 压缩产物），两者在缓存（`cache_control`）与压缩（`for_prompt`）上行为不同（[Ch5](./ch05-context.md)）。
+- 合并 `Session` 与 `Context`？不行。`Session` 是**全量事实**（追加日志），`Context` 是**投影**（本次请求可见子集），`Session.fork()` 与 `Context.for_prompt()` 的语义正交（[Ch7](./ch06-session.md) vs [Ch5](./ch05-context.md)）。
+- 拆出 `Memory` 为第七件？本书将 `Memory` 视为 `Context` 的**长期延伸**与 `Session` 的**索引层**（[Ch6](./ch05b-memory.md)），单独立章但不单列为顶层件，避免与 `Context` 职责混淆。
 
 ## 2.1b 六件套演化小史（论文对齐）
 
@@ -51,7 +53,7 @@ Loop  : State -> Model -> (ToolCalls | Text) -> Tools -> State'
 三条演化规律，贯穿全书：
 
 1. **每件都经历了"论文证明可行 → 协议标准化 → 工程纵深防御"三段式**：Tools 最典型——Toolformer 证明可行性（2023-02），Function Calling 完成协议化（2023-06），MCP 完成生态化（2024-11），之后各家的竞争全部转向权限/沙箱/可见性等纵深工程。
-2. **复杂度从模型侧向 Harness 侧转移**：2023 年的 Agent 复杂度在 prompt 里（AutoGPT 全靠提示词）；2026 年的复杂度在 Harness 里（八家的 system prompt 反而更克制）——这正是本书存在的理由。
+2. **复杂度从模型侧向 Harness 侧转移**：2023 年的 Agent 复杂度在 prompt 里（AutoGPT 全靠提示词）；2026 年的复杂度在 Harness 里（九家的 system prompt 反而更克制）——这正是本书存在的理由。
 3. **库与产品的分野随件数增加而扩大**：Qwen-Agent 六件只做四件（无 Session/Trace、弱安全），Pi 做五件半；产品形态五家六件全做且互相耦合。**每多承担一件，工程完备度的要求非线性上升**。
 
 ## 2.2 六件套详解（附反例）
@@ -91,13 +93,13 @@ while (true) { // outer: followUp
 - 中断语义：`Inbox.splice(next-turn vs next-step)` / `InputQueue.steer`
 - 预算闸：`needsCompaction / should_auto_compact / history_version`
 
-> 公共规律：**Loop 的本质是"采样→执行→回填"的闭合**，所有可靠性增强（重试、压缩、取消）都是在这个闭合上加"闸"。详见 Ch3 精读。
+> 公共规律：**Loop 的本质是"采样→执行→回填"的闭合**，所有可靠性增强（重试、压缩、取消）都是在这个闭合上加"闸"。详见 [Ch3](./ch03-loop.md) 精读。
 
 > 反例：若 Loop 无 `hop` 上限（Claude/Pi 的 `25`），模型在工具错误循环中会**无限采样**；若无 `cancellation_token`（`codex-rs/core/src/tools/context.rs:56`），用户 `Ctrl-C` 无法中断正在执行的 `bash`。
 
 ### 3) Tools — 规格与执行同源、权限是横切面
 
-公共形态（跨 8 家高度一致）：
+公共形态（九家中 8 家高度一致，Claw 为例外——见本节末反例与 [Ch4](./ch04-tools.md) 对证）：
 
 ```
 ToolSpec（可序列化为 LLM 可见的 JSON）  ←→  ToolExecutor（可执行）
@@ -115,9 +117,9 @@ ToolSpec（可序列化为 LLM 可见的 JSON）  ←→  ToolExecutor（可执�
 
 > 反例：若规格与执行分离（如早期 Claw `src/tools.py:24 load_tool_snapshot()` 仅做名字过滤），会出现**schema 漂移**——模型按旧 `parameters` 传参，执行侧已改校验，导致批量 `InvalidArgumentsError`。Codex 将 `spec()` 焊在 `handle()` 同一 trait 上即为对此的修正。
 
-详见 Ch4。
+详见 [Ch4](./ch04-tools.md)。
 
-### 4) Context / Memory — 预算驱动、投影而非重写
+### 4) Context / Memory — 预算驱动、投影而非改写
 
 ```
 Token 预算 ──► 估算（chars/4 或 tiktoken）──► 触发阈值 ──► 压缩策略
@@ -133,7 +135,7 @@ Token 预算 ──► 估算（chars/4 或 tiktoken）──► 触发阈值 �
 
 > 反例：若 Context 直接重写 Session（而非投影），`--resume` 与 `Session.fork()` 会丢失血缘；Pi 的两阶段 `transformContext → convertToLlm` 正是为了让压缩发生在 `AgentMessage` 层，不污染 `Message` 持久化层。
 
-详见 Ch5（Context 工程）与 Ch6（Memory 深潜）。
+详见 [Ch5](./ch05-context.md)（Context 工程）与 [Ch6](./ch05b-memory.md)（Memory 深潜）。
 
 ### 5) Session / Trace — 可重放优于可恢复
 
@@ -151,7 +153,7 @@ Token 预算 ──► 估算（chars/4 或 tiktoken）──► 触发阈值 �
 
 > 反例：若 Session 仅在 turn 结束时批量写（而非 `Session.append` 逐事件），崩溃会丢整 turn；Claude 为此在 `QueryEngine.submitMessage()` 中**先写 user 消息再调模型**，保证 `--resume` 可恢复。
 
-详见 Ch7 与 Ch10。
+详见 [Ch7](./ch06-session.md) 与 [Ch10](./ch09-observability.md)。
 
 ### 6) Model — 从 SDK 封装到适配器剥除
 
@@ -171,11 +173,11 @@ Retry/Attribution（重试 + 401 归因 + 计费分离）
 
 > 反例：若适配器将 `reasoningEffort/maxTokens` 直接注入 `LlmCallConfig` 且不剥除，插件层看到的是"被污染的配置"，无法做干净的 `waterfall 'agent/request'` 改写（DeepSeek `packages/llm/llm/src/adapter-failure.ts` 的动机）。
 
-详见 Ch8。
+详见 [Ch8](./ch07-model.md)。
 
 ## 2.3 五大约束（形式化）
 
-Agent Infra 要同时解的五道题（[理论卷 T1](./theory/chapter-01-landscape.md) 的框架，在本书七码一书对照中全部命中）：
+Agent Infra 要同时解的五道题（[理论卷 T1](./theory/chapter-01-landscape.md) 的框架，在本书九家对照中全部命中）：
 
 | 约束 | 形式化 | 典型解法 | 失效症状 |
 |------|--------|---------|---------|
@@ -230,4 +232,4 @@ async function agentLoop(userInput, ctx, model, tools) {
 
 ---
 
-> 下一章将把"闸"的第一类——**Loop 的调度与取消**——逐行拆开。
+> 下一章将把"闸"的第一类——**Loop 的调度与取消**（[Ch3](./ch03-loop.md)）——逐行拆开。

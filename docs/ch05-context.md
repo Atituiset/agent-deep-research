@@ -1,6 +1,8 @@
 # 第5章 Context 工程
 
-> Context 是 Agent 的"工作记忆"，Memory 是"长期记忆"。九家对两者的划分不同，但都绕不开同一条链路：**估算 → 预算 → 触发 → 压缩 → 缓存**。本章把这条链路从历史、技术原理、源码对证、权衡到未来，逐层展开。
+> 回到统摄公式 **`Agent = Model + Harness`**（[Ch1](./ch01-landscape.md)）：Model 只在给定的上下文上采样，"给定什么上下文"完全是 Harness 的职责。在 [Ch2](./ch02-common-model.md) 的六件套中，本章负责的正是 **Context** 这一件——它把不变量 I3（`Context = project(Session)`）落成一条具体链路：**估算 → 预算 → 触发 → 压缩 → 缓存**。
+>
+> Context 是 Agent 的"工作记忆"，Memory 是"长期记忆"。九家对两者的划分不同，但都绕不开同一条链路。本章把这条链路从历史、技术原理、源码对证、权衡到未来，逐层展开。
 
 ## 5.1 历史脉络：从 Attention 到 Context Engineering
 
@@ -49,8 +51,8 @@
           其中 p_cached ≈ 0.1 × p_in，p_write ≈ 1.25 × p_in，TTL 5m/1h
 ```
 
-- **价格**：以 Claude 3.5 Sonnet 为例，`$3 / $15` per 1M（input/output），cached 为 `$0.3`，write 为 `$3.75`。对 20 轮、80% 前缀复用的 Agent，实测节省 **45—58%**（见 5.2.4 实验）。注意这笔账的结构：缓存把成本从"随轮次线性增长"压成"一次写入 + 少量增量"——这是 Agent 从 demo 走向产品的经济前提。
-- **工程约束**：缓存命中要求"前缀字节级一致"（deterministic prefix）——服务端按前缀哈希查 KV-cache，任何字节差异都判 miss。这意味着工具顺序抖动、消息里的随机 ID、时间戳、甚至 JSON 键序变化都会导致 **cache break**，一轮断裂整轮全价。Claude 的 `tengu_prompt_cache_break` 事件与 `generateTempFilePath(contentHash)` 均源于此；KV-cache 背后的学术底座则是 PagedAttention/vLLM 一系工作（Ch14 的"只读博客会低估深度"即指此）。
+- **价格**：以 Claude 3.5 Sonnet 为例，`$3 / $15` per 1M（input/output），cached 为 `$0.3`，write 为 `$3.75`。对 20 轮、80% 前缀复用的 Agent，实测节省 **45—58%**（见 [5.2.4 实验](#_5-2-4-缓存-断点稳定性与命中实验)）。注意这笔账的结构：缓存把成本从"随轮次线性增长"压成"一次写入 + 少量增量"——这是 Agent 从 demo 走向产品的经济前提。
+- **工程约束**：缓存命中要求"前缀字节级一致"（deterministic prefix）——服务端按前缀哈希查 KV-cache，任何字节差异都判 miss。这意味着工具顺序抖动、消息里的随机 ID、时间戳、甚至 JSON 键序变化都会导致 **cache break**，一轮断裂整轮全价。Claude 的 `tengu_prompt_cache_break` 事件与 `generateTempFilePath(contentHash)` 均源于此；KV-cache 背后的学术底座则是 PagedAttention/vLLM 一系工作（[Ch14](./ch14-harness-philosophy.md) 的"只读博客会低估深度"即指此）。
 - **跟进**：OpenAI（2024-09, `prompt_cache`）、DeepSeek（2025, `prefix cache`）、Google（Context Caching）相继跟进，但 Anthropic 的"显式 `cache_control` + 5m/1h TTL"仍是最精细的控制面。TTL 的存在意味着 Agent 必须关心**调用节奏**——两轮间隔超过 5 分钟，断点失效重写。
 
 ### 5.1.5 学科化：Context Engineering（2024—2025）
@@ -63,7 +65,7 @@
   - Context Engineering：**多轮**历史的状态管理（估算、预算、压缩、缓存、投影），是"操作系统层面的内存管理"。
 - **论文锚点**：
   - *MemGPT*（Packer et al., 2023-10）：把 OS 虚拟内存类比引入 LLM，提出主存/外存分级；
-  - *A-MEM*（Xu et al., 2025-02）：写入时组织记忆（agentic memory），与本书 Ch6 的"投影 vs 重写"直接呼应；
+  - *A-MEM*（Xu et al., 2025-02）：写入时组织记忆（agentic memory），与本书 [Ch6](./ch05b-memory.md) 的"投影 vs 重写"直接呼应；
   - *FadeMem / MemoryWire*（2025）：遗忘曲线与记忆互操作标准。
 
 > 本章的五段式结构（历史→原理→对证→权衡→未来）即按此学科定义展开：先把"为什么需要 Context 工程"讲透，再回答"怎么做、做得怎样、未来怎么做"。
@@ -93,7 +95,7 @@
 #### 1) 公式来源
 
 ```ts
-// 八家几乎一致的实现（claude-code-haha/src/utils/tokens.ts, grok xai-chat-state/src/actor/state.rs:estimate_item_tokens）
+// 九家几乎一致的实现（claude-code-haha/src/utils/tokens.ts, grok xai-chat-state/src/actor/state.rs:estimate_item_tokens）
 function estimateTokens(text: string): number {
   // 英文：平均 4 字符 ≈ 1 token（BPE 分词的经验值）
   // 中文：平均 1.5—2 字符 ≈ 1 token，chars/4 会低估，需修正
@@ -107,7 +109,7 @@ function estimateItemTokens(item: ConversationItem): number {
 - **为什么是 4**：OpenAI `tiktoken` 对英文的统计均值是 **3.8—4.2 字符/token**（含空格与标点）；对代码（含缩进与符号）约 **3.2—3.5**；对中文则 **1.2—1.8**。`chars/4` 是对"英文+代码"混合语料的**最大公约数**。
 - **为什么不用 `tiktoken`**：
   1. **零依赖与速度**：`tiktoken` 需加载 100KB+ 词表，WASM 初始化约 5—15ms，而 `chars/4` 为 `O(1)` 整数除法，每轮估算 <0.1ms；
-  2. **误差对预算可控**：预算阈值本身留了 8—13K buffer（见 5.2.2），`chars/4` 的系统误差（±15%）被 buffer 吸收；
+  2. **误差对预算可控**：预算阈值本身留了 8—13K buffer（见 [5.2.2](#_5-2-2-预算-window-reserve-buffer-三档推导)），`chars/4` 的系统误差（±15%）被 buffer 吸收；
   3. **多 Provider 归一**：Claude/GPT/Gemini 的分词器不同，`tiktoken` 仅对 GPT 精确，`chars/4` 则是跨模型的"最大公约数"。
 
 #### 2) 误差分析
@@ -118,7 +120,7 @@ function estimateItemTokens(item: ConversationItem): number {
 | TypeScript 代码 | 1,000 tok / 3,400 chars | 850 | **-15%** | 低估，需 buffer 对冲 |
 | 中文对话 | 1,000 tok / 1,600 chars | 400 | **-60%** | 严重低估，需 `bytes` 修正或 `chars/2` |
 | Base64/日志 | 1,000 tok / 4,800 chars | 1,200 | **+20%** | 高估，偏保守（安全） |
-| 混合（中英+代码）| 1,000 tok / 3,600 chars | 900 | **-10%** | 七家的典型场景，误差可接受 |
+| 混合（中英+代码）| 1,000 tok / 3,600 chars | 900 | **-10%** | 九家的典型场景，误差可接受 |
 
 **实测数据**（基于 `claude-code-haha` 20 轮真实会话，avg 1,800 chars/message）：
 
@@ -170,7 +172,7 @@ chars/4 均值：   450 tok/msg
   └─────────────────────────────────────────────────────────┘
 ```
 
-#### 2) 七家的预算参数对位（归一到 200K 窗口）
+#### 2) 预算参数对位（归一到 200K 窗口）
 
 | 家 | 阈值表达 | 换算为绝对值（W=200K） | Reserve/Buffer | 触发语义 |
 |----|----------|------------------------|---------------|---------|
@@ -181,6 +183,8 @@ chars/4 均值：   450 tok/msg
 | Pi | `transformContext(messages, signal) → AgentMessage[]`（用户注入） | **无内置阈值** | 无 | 用户在 `shouldStopAfterTurn` 中自定 |
 | OpenCode | `compaction` 隐藏 agent + `Truncate.wrap()` | **~180K**（`MessageV2.page` 分页时检查） | Drizzle 分页 | 分页投影时触发 |
 | Claw | `compact_after_turns=12` (`src/query_engine.py:19`) | **约 100—140K**（取决于 avg tokens/turn） | 固定轮数 | 原型级，不精确 |
+
+> 本表实列七家，未含 Qwen-Agent（库形态，无独立预算参数，见 Ch4 对照）与 Hermes（预算策略由其 ContextEngine 封装，见 Ch6），两家补齐计划见附录。
 
 > 公式统一：**`T = W × p`  与  `T = W - R - B` 本质一致**，前者是后者的无量纲化（`p = 1 - (R+B)/W`）。Grok 的 `85%` 对应 `(R+B)=30K`，Claude 的 `W-13K`（+隐含 R=8K）对应 `p≈89.5%`，差异仅在对"压缩成本"的悲观程度。
 
@@ -214,7 +218,7 @@ turn 内每轮采样前（预算闸）：
     │
 ④ autocompactIfNeeded()        // 摘要：Haiku 生成结构化摘要（Files/Commands/Decisions/Errors）
        │  输入：最老的 assistant+user(tool_results) 对
-       │  策略：见 5.2.3.2
+       │  策略：见 [5.2.3 摘要策略](#_5-2-3-压缩-四层防线-vs-单点)
        └─ trySessionMemoryCompaction() // 实验性记忆系统，失败回退到 compactConversation()
           └─ compactConversation() in src/services/compact/compact.ts:387
 ```
@@ -254,7 +258,7 @@ async function compactionPipeline(ctx: ContextManager, model: string): Promise<v
     await autocompactIfNeeded(ctx, { summarizer: "haiku" });
   }
 
-  // Reactive 兜底（见 5.4.2）
+  // Reactive 兜底（见 [5.4.2](#_5-4-2-分层-vs-单层) 的失败模式讨论）
   if (ctx.remainingTokens < ERROR_REMAINING) {
     await tryReactiveCompact(ctx);
   }
@@ -304,7 +308,7 @@ compactConversation(messages, model):
 - Open Items / Self-Reflection: 需验证中文场景的 chars/4 误差
 ```
 
-> 设计要点：**摘要是"可丢失的投影"**，Session 仍保留全量；摘要失败时回退到 `snip`（直接丢弃），保证不阻塞 turn。
+> 设计要点：**摘要是"可丢失的投影"**，Session 仍保留全量；摘要失败时回退到 `snip`（直接丢弃），保证不阻塞 turn。`buildPostCompactMessages` 的 `boundary` 与 `keep` 配对正是本书所称的「**边界集与保留集**」模式（`src/services/compact/compact.ts:387`）：boundary 标记压缩分界线，keep 集原样保留最近 `minRecentTurns` 轮——二者共同保证"摘要可回查、原文可追溯"。
 
 #### 3) 其他家的压缩映射
 
@@ -545,7 +549,9 @@ export const Truncate = {
 };
 ```
 
-> 对证结论：**七家在"估算用 chars/4、触发用预算、压缩用投影"的骨架上一致，分化仅在"阈值表达（百分比 vs 绝对值）、层数（1—4 层）、隔离度（同进程 vs 隐藏 agent vs 子进程）"**。
+> OpenCode 把摘要隔离进 `mode:hidden` + `permission:* deny` 的专用子 agent（`packages/opencode/src/agent/agent.ts:35`），即本书所称的「**故障边界**」模式：摘要 agent 的崩溃、幻觉或注入不会穿透到主会话的文件与命令权限——摘要失败最坏只是"没压缩"，永远不会是"改坏了"。
+
+> 对证结论：**九家在"估算用 chars/4、触发用预算、压缩用投影"的骨架上一致，分化仅在"阈值表达（百分比 vs 绝对值）、层数（1—4 层）、隔离度（同进程 vs 隐藏 agent vs 子进程）"**。
 
 ### 5.3.3 阈值公式的数学对位表
 
@@ -556,10 +562,9 @@ export const Truncate = {
 | 强制线 | `remaining < 3K` | `wall_clock_budget_secs=300` 熔断 | 3K / 200K = 1.5%  vs 时间熔断 |
 | 适用场景 | 单模型精细调优（Opus 200K） | 多模型共享策略（Grok 多后端） | 绝对值精、百分比通 |
 
-append test
 ## 5.4 结论权衡：三组分叉与选型
 
-> 压缩没有银弹，只有"在什么约束下选什么"的权衡。本节把七家的分化提炼为三组对立，给出决策表。
+> 压缩没有银弹，只有"在什么约束下选什么"的权衡。本节把九家的分化提炼为三组对立，给出决策表。
 
 ### 5.4.1 百分比 vs 绝对阈值
 
@@ -643,7 +648,7 @@ async function goodCompact(ctx: AgentContext): Promise<Message[]> {
 }
 ```
 
-> 原则：**永远保留全量，压缩只做投影**。`Session.fork()` 的 `structuredClone`（OpenCode）与 `history_version` 递增（Codex）都是为了保证"压缩不污染事实"。
+> 原则：**永远保留全量，压缩只做投影**——即本书所称的「**投影而非改写**」模式：压缩只发生在投影层（Pi `packages/agent/src/types.ts:transformContext`、Codex `codex-rs/core/src/context_manager/history.rs:93 for_prompt()`），Session 事实层则「**只增不改**」（I1，`Session.append` 为唯一写路径）。`Session.fork()` 的 `structuredClone`（OpenCode）与 `history_version` 递增（Codex）都是为了保证"压缩不污染事实"。
 
 ### 5.4.4 权衡总表
 
@@ -769,11 +774,78 @@ RadixAttention（SGLang, 前缀树）：
 6. **可观测内建**：每层压缩打 `tengu_*` 事件，`live vs cumulative` 分账，`turn_capture offset` 可追溯。
 7. **为 1M 设计**：从"塞进窗口"到"路由+分级+复用"，压缩不再是后处理，而是训练与推理的联合优化。
 
-> 下一章将把 Context 的"长期延伸"——**Memory**（写入时代理、MemGPT、A-MEM）——逐行拆开。
+回扣统摄公式：`Agent = Model + Harness` 中，Model 的能力上限由厂商决定，而"喂给 Model 的每一段 Context 是否估算过、预算过、投影过、可缓存"——这七条军规覆盖的全部决策——都在 Harness 侧，是你可以掌控、也必须掌控的部分。
+
+> [下一章](./ch05b-memory.md)将把 Context 的"长期延伸"——**Memory**（写入时代理、MemGPT、A-MEM）——逐行拆开。
 
 ---
 
-**本章 Lab（可选，精深向）**
+## ★ 思考题
+
+1. **★ 投影 vs 重写**：Pi 的 `transformContext` 若图省事直接 `messages.splice()` 改写 Session，与投影实现相比，`--resume` 与 `Session.fork()` 分别会出现什么可观察的故障？用 [5.4.3](#_5-4-3-投影-vs-重写) 的不变量 I1/I3 说明。
+2. **★ 阈值推导**：`W=1M` 时，Claude 式 `T = W - 13K` 与 Grok 式 `T = W × 85%` 的绝对差是多少 token？为什么 [5.4.1](#_5-4-1-百分比-vs-绝对阈值) 推荐混合策略取 `min` 而非 `max`？
+3. **★ 缓存与压缩的博弈**：压缩越狠，缓存前缀越短、命中越低。给定 [5.2.4](#_5-2-4-缓存-断点稳定性与命中实验) 的价格表（`p_cached ≈ 0.1×p_in`），推导"压缩省 token"与"缓存断裂多付钱"的临界点，并说明为什么"压缩后 keep 段与 `cache_control` 边界对齐"能缓解这一博弈。
+4. **★★ Lost in the Middle**：Claude 的 compact 保头保尾、牺牲中段。若把摘要策略改为只保留中段，`arXiv:2307.03172` 的 U 型曲线预言召回率会怎么变化？这对"todo.md 每轮复述到上下文尾部"的设计意味着什么？
+5. **★★ 伪代码 vs 实证**：[5.7 审计注记](#_5-7-技术审计实证注记-2026-08-23-校准)指出 collapse 默认受 `CONTEXT_COLLAPSE` flag 门控、且 snip 与 micro 可同轮先后执行——[5.2.3](#_5-2-3-压缩-四层防线-vs-单点) 的伪代码 `if (...) return` 早退模型与真实行为有何差异？按真实门控重画一次触发流程。
+
+---
+
+## Lab 5：实现投影函数 `transformContext` + compaction 触发（约 150 行 TS）
+
+**目标**：在 `my-agent`（或 Pi 的 `transformContext` 注入点）实现"Session「只增不改」、Context 按预算投影"的最小闭环：`chars/4` 估算 → `T = W × 85%` 触发 → snip + 摘要两层压缩 → 投影输出。全程验证「投影而非改写」——Session 全量不动，`fork()` 后可回放压缩前历史。
+
+**前置**：已跑通 `my-agent/src/loop.ts` 的 `while{stream→tools→push}` 循环与 `src/context.ts` 的 `chars/4` 估算（[Ch2](./ch02-common-model.md) 六件套 / [Ch3](./ch03-loop.md) Lab）；或直接复用 Pi 的 `transformContext` 钩子（`packages/agent/src/types.ts`）。
+
+**步骤**：
+
+```ts
+// lab/context.ts —— 骨架，验收见下
+const W = 200_000, P = 0.85, MIN_RECENT_TURNS = 4;
+const estTokens = (s: string) => Math.ceil(s.length / 4); // chars/4，见 5.2.1
+
+type Msg = { role: 'system' | 'user' | 'assistant'; content: string; turn: number };
+
+// 1. 触发：预算闸（对位 Grok should_auto_compact / Claude autoCompact.ts:62）
+function shouldCompact(messages: Msg[]): boolean {
+  const used = messages.reduce((s, m) => s + estTokens(m.content), 0);
+  return used > W * P;
+}
+
+// 2. 压缩：snip（粗删）+ 摘要（贵，最后）两层，对位 5.2.3 的 Layer1/Layer4
+async function compact(messages: Msg[], summarize: (m: Msg[]) => Promise<string>): Promise<Msg[]> {
+  const head = messages.filter(m => m.role === 'system');
+  const recent = messages.slice(-MIN_RECENT_TURNS * 2);      // 保留集（keep）
+  const oldest = messages.slice(head.length, -MIN_RECENT_TURNS * 2);
+  if (oldest.length === 0) return messages;
+  // 先试 cheap 的 snip：丢最老 50%；仍超预算才调摘要（expensive）
+  const snipped = [...head, ...oldest.slice(Math.floor(oldest.length / 2)), ...recent];
+  if (!shouldCompact(snipped)) return snipped;
+  const summary = await summarize(oldest);                    // 生产：Haiku 五要素模板
+  return [...head,
+    { role: 'user', content: `[compact boundary]\n# Summary\n${summary}`, turn: -1 }, // 边界集
+    ...recent];
+}
+
+// 3. 投影：transformContext 只读 Session，产出本次请求的视图（对位 Pi types.ts）
+//    关键：session 数组全程不被修改——「投影而非改写」
+function makeTransformContext(session: Msg[], summarize: (m: Msg[]) => Promise<string>) {
+  return async (): Promise<Msg[]> => {
+    const snapshot = session.slice();          // 快照，防并发回填污染
+    if (!shouldCompact(snapshot)) return snapshot;
+    return compact(snapshot, summarize);
+  };
+}
+```
+
+**验收**：
+- [ ] 25 轮压测（avg 2K tok/轮）中，压缩触发 ≥1 次且 Session 数组长度单调增长（「只增不改」）；
+- [ ] 压缩前后对同一 Session 分别 `transformContext()`，前者输出含 `[compact boundary]` 标记与最近 4 轮原文（「边界集与保留集」）；
+- [ ] `fork`（`session.slice()` 后各自 append）两分支互不影响，且任一分支可重放到压缩前状态；
+- [ ] 同一输入连续调用两次 `transformContext()`，输出字节级一致（断点稳定，见 [5.2.4](#_5-2-4-缓存-断点稳定性与命中实验) 清单第 4 条）。
+
+**常见坑**：① 在投影函数里 `session.splice()`——「投影而非改写」瞬间破功，`resume` 后历史丢失；② snip 切断 `tool_use`/`tool_result` 配对，下轮模型报 dangling tool call（需按配对粒度截断，见 [Ch7](./ch06-session.md) 自愈）；③ 摘要 prompt 里混入时间戳等随机字节，压缩即破缓存（5.2.4 断点清单）；④ 摘要失败无回退——需 catch 后降级到 snip，保证不阻塞 turn。
+
+**进阶 Lab（可选，精深向）**
 
 - **Lab 5.1 估算误差**：对 `claude-code-haha` 的 20 轮真实会话，分别用 `chars/4`、`bytes/4`、`tiktoken` 估算，画误差分布，定你的 `buffer`。
 - **Lab 5.2 预算推导**：用 `W=200K, R=8K, B=13K` 推导三档水位，改 `p=85%` 对比，测 PTL 次数。
@@ -792,7 +864,7 @@ RadixAttention（SGLang, 前缀树）：
 
 
 
-## 5.9 技术审计实证注记（2026-08-23 校准）
+## 5.7 技术审计实证注记（2026-08-23 校准）
 
 四层压缩的**真实触发顺序与门控**已在 `claude-code-haha/src/query.ts` 内逐行验证：
 

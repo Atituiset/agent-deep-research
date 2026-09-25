@@ -1,6 +1,8 @@
 # 第8章 模型抽象与多 Provider
 
-> 模型抽象层决定 Agent 能跑在多少环境、能多快接入新模型、以及失败时能否优雅降级。七家从"单 SDK 直连"演进到"适配器剥除"，本质是在回答：**当协议分裂、计费分账、鉴权归因相互纠缠时，抽象边界应该画在哪里**。
+> 模型抽象层决定 Agent 能跑在多少环境、能多快接入新模型、以及失败时能否优雅降级。九家从"单 SDK 直连"演进到"适配器剥除"，本质是在回答：**当协议分裂、计费分账、鉴权归因相互纠缠时，抽象边界应该画在哪里**。
+
+**挂回全书公式**：`Agent = Model + Harness`，Harness 的内部结构即 [Ch2](./ch02-common-model.md) 的六件套——Prompt / Loop / Tools / Context / Session / Model。本章负责其中的第六件 **Model（抽象/适配层）**：公式右端的 Model（LLM 本身）是被调度、被约束的外部依赖，本章拆的是 Harness 侧"把分裂的协议、鉴权与计费收敛成一次干净采样调用"的那层壳——即 [Ch1](./ch01-landscape.md) 全景图上"可移植性"维度的展开。
 
 **本章目标**：读完能（1）按时间轴复述 Provider 抽象与协议分化的三次分裂；（2）手绘 Provider→Adapter→PreparedLlmCall→Retry→计费 的五层分层图与 StreamChunk 状态机；（3）对照各家源码锚点逐行解释"适配器剥除"为何成为 2026 的新共识；（4）在"单 SDK / AI SDK / 自建适配器"三选一时给出量化权衡；（5）对 Model Router 等五个前沿方向提出可验证假设。
 
@@ -54,7 +56,7 @@ Provider 抽象 (2022 LangChain → 2023 AI SDK / LiteLLM)
 - **AI SDK 2023** 的矫正是"薄抽象"：仅抽象 `LanguageModelV3{doGenerate,doStream}` + `Provider{languageModel(modelId)}`，工具、上下文、重试均不在 Provider 层，OpenCode 的 `BundledSDK` 即直接复用此层，10+ provider 零改动接入。
 - **LiteLLM 2023** 走另一极端：`model="anthropic/claude-3-5-sonnet"` 字符串路由，`completion()` 单函数打通所有 Provider，代价是 `reasoning_effort/maxTokens` 等新参数只能走 `extra_body`，类型与校验丢失。
 
-> 教训：**Provider 抽象的厚度 = 可移植性 × 类型安全 的折衷**。AI SDK 的"薄而有型"（`LanguageModelV3` 双方法 + `zod` 校验）在七家中胜出。
+> 教训：**Provider 抽象的厚度 = 可移植性 × 类型安全 的折衷**。AI SDK 的"薄而有型"（`LanguageModelV3` 双方法 + `zod` 校验）在九家中胜出。
 
 **位移 2 — 从"单协议"到"协议分化"**
 
@@ -402,9 +404,11 @@ if let Some(details) = response.context_details {
 }
 ```
 
-> **原则**：`live 长度驱动压缩，cumulative 用量驱动计费`，两者不可混用（Ch5/Ch6 已述，此处为模型层的对应实现）。
+> **原则**：`live 长度驱动压缩，cumulative 用量驱动计费`，两者不可混用（[Ch5](./ch05-context.md)/[Ch6](./ch05b-memory.md) 已述，此处为模型层的对应实现）。
 
 ### 8.2.4 失败归一与重试：normalizeLlmFailure + 401 归因
+
+> 本节是本书模式**「故障边界」**（[Ch1 §1.5](./ch01-landscape.md#_1-5-五个贯穿全书的设计模式-词汇债券)）在模型层的兑付锚点：各 Provider 的原始异常必须在 Adapter 层归一为统一的 `LlmError`，上层 Loop 只看到 `retryable / retryAfterMs / requestId`，永不见下层的原始异常形态。
 
 #### 1) 失败归一
 
@@ -569,7 +573,7 @@ auth_callback.record_401(SamplingConsumer::Sampler, prefix);
 
 ## 8.3 对证：九家源码对证
 
-> 本节所有锚点均为真实文件与行号（快照 2026-08-22），详见附录 B。对比的不是"有无多 Provider"，而是"抽象边界画在哪里、剥除发生在哪一层、失败如何归因"。
+> 本节所有锚点均为真实文件与行号（快照 2026-08-22），详见[附录 B](./appendix-sources.md)。对比的不是"有无多 Provider"，而是"抽象边界画在哪里、剥除发生在哪一层、失败如何归因"。
 
 ### 8.3.1 总览对比表
 
@@ -582,6 +586,8 @@ auth_callback.record_401(SamplingConsumer::Sampler, prefix);
 | **DeepSeek** | `dsh-llm` 三适配器 + 显式剥除 | `packages/llm/*` `dsh-llm{LlmCallConfig,PreparedLlmCall,StreamChunk}` + `llm-retry` + `llm-pi-ai` + `assembler.ts:BlockAssembler` | `deepseek/pi-ai/retry` 三适配器（`prepareCall(config,signal)→{config,adapterDefaults,retryPolicy,context}`） | `ChatCompletions` 主 + `StreamChunk/BlockAssembler` 归一 | `adapter-failure.ts:normalizeLlmFailure()` + `errorChain()` → `LlmError{failure{message,code,status,retryAfterMs,requestId}}` + `api-key.ts:normalizeApiKey(){^[\x21-\x7E]+$}` + `waterfall 'agent/request-error'` | `normalizeApiKey` 字符集校验 |
 | **Grok** | `SamplingClient` 六端点 + 全量透传 | `xai-grok-sampler/src/lib.rs SamplingClient` + `xai-grok-models` + `xai-grok-auth` + `xai-grok-tools/src/bridge.rs ToolBridge` | **三后端×流/非流=六端点**：`chat_completions/responses/messages × stream/non-stream` | `chat_completions/responses/messages` 三协议 + `deserialize_response_event()` 容忍 `x_search` | `SENT_BEARER_PREFIX_LEN=12` 截断 + `Auth401AttributionCallback{record_401(consumer: SamplingConsumer{...}, sent_bearer_prefix)}` + `truncate_to_prefix` | `xai-grok-auth`（`x-api-key/Authorization` + 401 归因） |
 | **Claw** | 双 Provider 极简 | `rust/crates/api/src/client.rs` + `sse.rs` + `providers/{claw_provider,openai_compat}.rs` + `rust/crates/runtime/src/session.rs Session{version,messages}` | `ClawProvider/OpenAICompat` 双实现（`ApiClient::stream() → Vec<AssistantEvent>` 批量流） | `ChatCompletions` 兼容（`OpenAICompat`） | 固定 `compact_after_turns=12` + 无指数退避 | 直连 bearer |
+
+> **注记**：本表实列七家。**Qwen-Agent** 的模型调用走 `llm/` 模块 + `fncall_prompts` 文本协议（无协议级 `tool_calls`），属"库形态对照组"，其专门处理见 [Ch4](./ch04-tools.md) 与 [附录 B](./appendix-sources.md) Qwen-Agent 节；**Hermes** 的差异集中在可插拔 `ContextEngine` 与多终端后端一侧，见 [Ch3](./ch03-loop.md) 对证表与 [Ch6](./ch05b-memory.md)。两家均不编造入列；§8.3.2 分家精读与 §8.3.3 小结表同此口径。
 
 ### 8.3.2 分家精读
 
@@ -635,7 +641,7 @@ async function attemptWithFallback<T>(fn: () => Promise<T>, fallbackModel?: stri
 **精读点**：
 
 - **为何选单 SDK**：Claude 早期仅需跑通 Anthropic 主链路，`Bedrock/Vertex` 仅为"兼容分支"（`if baseURL contains bedrock`），模型切换靠 `getMainLoopModel()` 的配置而非 Provider 路由——这是"单 SDK 直连"的典型：**快，但每新增一 Provider 就多一分支**。
-- **`cache_control: ephemeral` 的位置**：在 `claude.ts:361 getCacheControl()` 中按 `querySource` 决定 `ttl: 5m|1h`，且 `system/tools/history` 三断点均显式标记，是 Prompt Caching 最精细的实现（见 Ch5）。
+- **`cache_control: ephemeral` 的位置**：在 `claude.ts:361 getCacheControl()` 中按 `querySource` 决定 `ttl: 5m|1h`，且 `system/tools/history` 三断点均显式标记，是 Prompt Caching 最精细的实现（见 [Ch5](./ch05-context.md)）。
 - **Fallback 的代价**：`tombstone + stripSignatureBlocks` 需重写 Session 中未闭合的 `tool_use`，否则降级模型的第二轮采样会因"悬垂 `tool_use` 缺 `tool_result`"而 PTL。
 
 #### Codex — `codex-model-provider/` 的三件套 + `responses_retry.rs`
@@ -776,7 +782,7 @@ export type StreamFn = (model: Model, context: Context) => AsyncIterable<StreamC
 
 **精读点**：
 
-- **四抽象的极简**：`Api/Model/Context/Tool` 仅 4 个 `type`，无 `PreparedLlmCall`/`Adapter` 分层，所有归一在 `pi-ai` 包内完成——这是"教学级薄抽象"：**可读性最高，但剥除与 401 归因需用户自补**。
+- **四抽象的极简**：`Api/Model/Context/Tool` 仅 4 个 `type`，无 `PreparedLlmCall`/`Adapter` 分层，所有归一在 `pi-ai` 包内完成——这是"教学级薄抽象"：**可读性最高，但剥除与 401 归因需用户自补**。也是本书模式**「最小 Harness 税」**（[Ch1 §1.5](./ch01-landscape.md#_1-5-五个贯穿全书的设计模式-词汇债券)）在模型层的兑付：只为当前需求支付最低抽象成本，重试、剥除、分账等"税项"全部留给上层按需自补。
 - **`getApiKey` 的多源**：`keychain → env → OAuth refresh` 三级回退，支持 Anthropic 短期凭证（`oauth_token` 1h 过期前自动 `refresh`），是多环境鉴权的最小可用实现。
 - **局限**：无 `SENT_BEARER_PREFIX_LEN` 截断、无 `normalizeLlmFailure` 归一、无 `live vs cumulative` 分账——生产级需在 `pi-ai` 之上自建 L4/L5。
 
@@ -880,7 +886,7 @@ fn truncate_to_prefix(bearer: &str) -> &str { &bearer[..bearer.len().min(SENT_BE
 
 - **六端点的本质**：`api_backend × stream` 的笛卡尔积并非"厂商炫技"，而是"同一 Agent 跑在不同 API 形态"的必然——`chat_completions` 跑通用推理、`responses` 跑带 `reasoning` 的思考、`messages` 跑 Anthropic 兼容（Bedrock/Vertex 透传），单 Agent 需按"模型×后端×流形态"六选一。
 - **`GrokRequestHeaders` 全量透传**：`x-grok-conv-id/req-id/model-override/session-id/turn-idx/agent-id/deployment-id/user-id` 八个头，每个对应一类观测/路由需求（如 `turn-idx` 供服务端按 turn 计费，`agent-id` 供多 agent 归因）。
-- **`SENT_BEARER_PREFIX_LEN=12` 的强一致**：`sampler → callback` 边界截断 bearer，与 `shell/auth/manager.rs` 的 `token_suffix` 强一致，全量密钥永不进日志——这是七家中**唯一显式处理 401 归因安全**的实现。
+- **`SENT_BEARER_PREFIX_LEN=12` 的强一致**：`sampler → callback` 边界截断 bearer，与 `shell/auth/manager.rs` 的 `token_suffix` 强一致，全量密钥永不进日志——这是九家中**唯一显式处理 401 归因安全**的实现。
 - **`context_details` live 重写**：`apply_terminal_event_overrides()` 以 `context_details` 重写 `total_tokens` 为 live 长度（`/context` 进度与 `auto_compact` 阈值），而 `input/output/cached` 保持 cumulative 供计费，解决服务端 loop 的 inflate（见 8.2.5）。
 
 #### Claw — `rust/crates/api/src/client.rs` 的双 Provider 极简
@@ -916,11 +922,11 @@ impl Provider for OpenAICompat {
 
 **精读点（反例价值）**：
 
-- **双实现的极简**：`ClawProvider`（私有协议）+ `OpenAICompat`（ChatCompletions 兼容）覆盖"自有 API vs 通用 API"两态，代码最短，但**批量流 `Vec<AssistantEvent>` 无增量 Chunk**，无法做`边收边执行`与`块级取消`（见 Ch3 的批量流 vs 增量流对比）。
+- **双实现的极简**：`ClawProvider`（私有协议）+ `OpenAICompat`（ChatCompletions 兼容）覆盖"自有 API vs 通用 API"两态，代码最短，但**批量流 `Vec<AssistantEvent>` 无增量 Chunk**，无法做`边收边执行`与`块级取消`（见 [Ch3](./ch03-loop.md) 的批量流 vs 增量流对比）。
 - **无适配器剥除**：`ChatRequest` 直接透传，无 `PreparedLlmCall` 分离，插件无法区分"业务意图"与"适配器默认"。
 - **移植价值**：`rust/crates/api/src/sse.rs` 的 SSE 解析与 `providers/openai_compat.rs` 的兼容层，展示如何把 TS 的 `LanguageModelV3` 薄抽象翻译为 Rust 的 `trait Provider`，是"TS→Rust 移植"的桥梁案例。
 
-### 8.3.3 七家对证小结：一张"抽象厚度"表
+### 8.3.3 对证小结：一张"抽象厚度"表
 
 | 维度 | Claude | Codex | OpenCode | Pi | DeepSeek | Grok | Claw |
 |------|--------|-------|----------|----|----------|------|------|
@@ -931,13 +937,13 @@ impl Provider for OpenAICompat {
 | **重试** | Fallback 降级 | 指数退避+降级 | SSE 双超时 | 可注入 | waterfall 插件化 | 401 归因 | 无 |
 | **计费分账** | 无显式 | 无显式 | 无显式 | 无显式 | 打标 `markAgentLoopRequest` | **live vs cumulative 显式分离** | 无 |
 
-> 结论：七家差异不在"是否支持多 Provider"，而在"在何处切分意图与适配、增量与批量、live 与 cumulative"。DeepSeek 的`剥除`与 Grok 的`分账`是 2026 年的两条新边界。
+> 结论：九家差异不在"是否支持多 Provider"，而在"在何处切分意图与适配、增量与批量、live 与 cumulative"。DeepSeek 的`剥除`与 Grok 的`分账`是 2026 年的两条新边界。
 
 ---
 
 ## 8.4 结论权衡：四组分叉与选型
 
-> 模型抽象没有银弹，只有"在什么约束下选什么"的权衡。本节把七家的分化提炼为四组对立，给出决策表。
+> 模型抽象没有银弹，只有"在什么约束下选什么"的权衡。本节把九家的分化提炼为四组对立，给出决策表。
 
 ### 8.4.1 单 SDK 直连 vs AI SDK 统一 vs 适配器剥除
 

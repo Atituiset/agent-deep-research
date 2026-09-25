@@ -2,6 +2,8 @@
 
 > 先回答四个问题：Agent Infra 是什么、它从哪来（60 年历史脉络）、为什么 2025–2026 成了拐点、九家实现各自站在哪里。本章是全书地图——后续每章都会回到这张地图上定位。
 
+本书的统摄公式是：**Agent = Model + Harness**。Model 负责采样与推理，Harness 负责其余一切——调度、工具、记忆、持久化与防护。Harness 的内部结构在[第 2 章](./ch02-common-model.md)被形式化为**六件套**：Prompt、Loop、Tools、Context、Session、Model 抽象（对底层各家 LLM 的适配层）。本章的九家全景，就是按各家在这六件套上的取舍来定位的。
+
 ## 1.1 Agent Infra 的层次
 
 ```
@@ -17,7 +19,7 @@
 └──────────────────────────────────────────────┘
 ```
 
-传统软件与 Agent 软件的类比在八家源码中得到逐一印证：
+传统软件与 Agent 软件的类比在九家源码中得到逐一印证：
 
 | 传统组件 | Agent 对应 | 本书证据 |
 |---------|-----------|---------|
@@ -31,7 +33,7 @@
 > MemGPT 的 OS 类比：上下文窗口 ≈ RAM，外部历史 ≈ Disk。落成两个动作——
 >
 > - **compaction（压实）**：窗口装不下全量历史时，把老轮次**摘要**成几句话（如 50KB 的文件读取结果 → 一行"已读过 X"），腾出空间。Claude 的四层压缩（Ch5.4）是最精细的实现。
-> - **projection（投影）**：Session 永远保留全量（append-only），每次请求只把"当前可见子集"发给模型——像数据库 VIEW：底层不动，视图随查询变。Codex `for_prompt()`、Pi `transformContext` 都是投影函数。
+> - **projection（投影，即「投影而非改写」）**：Session 永远保留全量（append-only，即「只增不改」），每次请求只把"当前可见子集"发给模型——像数据库 VIEW：底层不动，视图随查询变。Codex `for_prompt()`、Pi `transformContext` 都是投影函数。
 >
 > 二者关系：**compaction 是生成投影的手段之一；projection 是"不改写历史"的纪律**。特例两行：Qwen-Agent 不存对话记忆、每轮用 RAG 检索临时换页（`memory/memory.py:32`）；Hermes 把整套策略抽成 `ContextEngine(ABC)` 运行时可换（`context_engine.py:89`）。
 
@@ -76,7 +78,7 @@ Agent Infra 不是凭空出现的——它是四条独立 lineage 的会合：
 2023-02 Toolformer (arXiv:2302.04761)          自监督学会调 API → 工具学习范式确立
 2023-06 OpenAI Function Calling                协议标准化第一枪
 2023-05 Gorilla (arXiv:2305.15334)             检索式工具选择 + 幻觉缓解
-2024-11 MCP (Anthropic)                        工具生态互操作标准 → 八家中七家原生支持
+2024-11 MCP (Anthropic)                        工具生态互操作标准 → 九家中八家原生支持
 2024  BFCL (Berkeley Function Calling Leaderboard)  工具调用可评测化
 ```
 
@@ -99,11 +101,11 @@ Agent Infra 不是凭空出现的——它是四条独立 lineage 的会合：
 四个推力在本书的源码对照中清晰可见：
 
 1. **学术收敛**：MemGPT → A-MEM → FadeMem → memorywire；ReAct → SWE-agent。九家实现中，Claude 的 `snip/micro/collapse`、Grok 的 `two_pass`、DeepSeek 的 `compaction-basic + tool-result-pruner` 都是对同一批论文的不同工程回答。
-2. **产业验证**：独立的 Memory Infra 团队出现；八家里已有 5 家把 Memory/Context 拆为独立 crate/package（Grok `xai-grok-compaction/xai-grok-memory`、DeepSeek `compaction-*`、Codex `context_manager`、OpenCode 隐藏 compaction agent、Claude compact 服务目录）。
+2. **产业验证**：独立的 Memory Infra 团队出现；九家里已有 5 家把 Memory/Context 拆为独立 crate/package（Grok `xai-grok-compaction/xai-grok-memory`、DeepSeek `compaction-*`、Codex `context_manager`、OpenCode 隐藏 compaction agent、Claude compact 服务目录）。
 3. **模型侧变化**：长上下文（200K–1M）与 Prompt Caching 让"全量重放 + server cache"（Codex `store:false`）成为可行解，也让"token 预算驱动的压缩"成为必选项。
 4. **生态标准化**：MCP 成事实标准（除 Pi 外均原生支持），Skill/Plugin 成为第二层扩展。
 
-## 1.4 八家定位一张图
+## 1.4 九家定位一张图
 
 按"**抽象层厚度**"（横轴）与"**工程完备度**"（纵轴）定位：
 
@@ -133,8 +135,24 @@ Agent Infra 不是凭空出现的——它是四条独立 lineage 的会合：
 
 > 读法提示：把 **Qwen-Agent 当对照组**——它在 Session/Trace/权限三层留白，恰好反衬产品形态五家各自补了什么（详见 7.3.2/10.3.2/11.3.2 三处专节分析）。
 
-## 1.5 本书的读法：五段式
+## 1.5 五个贯穿全书的设计模式（词汇债券）
+
+九家的差异在细节，共性在模式。以下五个设计模式会在后续章节反复出现，此处一次命名——**后续各章认领实例时，一律使用这里的同一个名字**，不再另造术语。
+
+| 模式 | 一句话定义 | 源码实例锚点 |
+|------|-----------|-------------|
+| **只增不改** | Session 只追加事件、从不改写历史，崩溃恢复靠重放而非修复 | Claude `src/QueryEngine.ts:184`：`submitMessage()` 先预写 user 消息 transcript 再调模型 |
+| **投影而非改写** | 发给模型的 Context 是 Session 全量历史的只读投影，压缩只改视图、不动底账 | Codex `codex-rs/core/src/context_manager/history.rs:206 for_prompt()` |
+| **边界集与保留集** | 上下文预算必须拆出一块不可动用的"保留集"，在越界之前先触发压缩 | Claude `src/services/compact/autoCompact.ts:62`：`AUTOCOMPACT_BUFFER_TOKENS=13_000`，在窗口耗尽前预留缓冲 |
+| **故障边界** | 每层的失败必须在本层归一化，不让上层看到下层的原始异常形态 | DeepSeek `packages/llm/llm/src/adapter-failure.ts`：`normalizeLlmFailure()` 把各 API 后端的错误归一为统一故障 |
+| **最小 Harness 税** | Harness 加收的开销（抽象层、钩子、观测）能省则省；判据是"删掉它最小闭环还能不能跑" | Pi `packages/agent/src/agent-loop.ts:155 runLoop`：约 200 行即跑通全闭环，税近乎为零 |
+
+## 1.6 本书的读法：五段式
 
 第 3–11 章每章固定五段：**①历史脉络与论文 lineage → ②原理深潜 → ③对证分解（源码锚点）→ ④结论权衡 → ⑤未来方向**，并配 Lab 与思考题。建议先读本章时间线建立坐标系，再按 Ch12 的四阶段路线进入各章——每段都能回答"这行代码是哪篇论文的哪个思想落地成的"。
+
+## 1.7 小结
+
+回扣章首公式 **Agent = Model + Harness**：本章为 Harness 一侧建立了坐标系——§1.1 的层次图说清 Harness 夹在应用与模型之间的位置，§1.2/§1.3 给出它的来历与拐点，§1.4 用六件套的取舍定位九家，§1.5 立下五个贯穿全书的设计模式。从第 2 章起，公式右半边的六件套将被逐件拆开。
 
 > 下一章把"无论哪家都绕不开"的公共知识形式化为六件套模型，并给出六件套各自的演化小史。

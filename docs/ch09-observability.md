@@ -1,5 +1,7 @@
 # 第10章 可观测性与评测
 
+> 回到统摄公式 **`Agent = Model + Harness`**（[Ch1](./ch01-landscape.md)）：Model 负责采样，六件套负责编排，但"它们实际干得怎么样"需要一条贯穿全栈的证据链——这就是本章负责的 **Observability**。在 [Ch2](./ch02-common-model.md) 的六件套里，Trace 挂在 **Session** 一件之下（不变量 I1 可重放的前提是全量记录），而用量归一与成本分账横跨 **Context**（压缩阈值）与 **Model**（计费口径）两处决策。
+>
 > 没有度量就没有工程。本章回答三个问题：(1) Agent 该记什么——trace 的最小完备集；(2) 怎么归因——live/cumulative 与成本分账；(3) 怎么评好坏——从 SWE-bench 到 process reward 的评测脉络。
 
 ## 本章图谱
@@ -61,7 +63,7 @@ Agent trace 不是新发明——它把分布式系统二十年的追踪实践�
 - **WebArena：环境即考卷**。此前 Web 评测多用录制的静态页面快照，Agent 只要做"看起来对的事"。WebArena 反其道：自托管四个真实网站的开源克隆（论坛、购物、GitLab、地图），812 个长 horizon 任务以**后置条件**判分（数据库里真的多了那张订单吗）而非截图对比。代价是部署重（一套 Docker Compose），收益是不可作弊——状态改变骗不了数据库。
 - **Tau-bench：给"服务型 Agent"加上策略与用户两面镜子**。ReAct 作者团队的后续工作，瞄准客服类场景的双难：既要完成任务（工具调对了），又不能违反公司政策（退款额度、身份核验）。做法是让 LLM 扮演**有隐藏需求的用户模拟器**与 Agent 多轮博弈，同时用规则引擎核对每步是否符合领域 policy；指标采用 pass^k——k 次独立运行**全部**通过才算过，暴露"平均分掩盖的不稳定性"。航空/零售两域的实测显示最强模型的 pass^1 也不到七成——服务型 Agent 离生产还差几个数量级。
 - **LLM-as-Judge / MT-Bench：没有标准答案时怎么打分**。Zheng et al. 用 GPT-4 当裁判给两个模型的开放回答打分，与人类偏好一致率超八成——于是开放式任务终于有了可扩展的评分器。但他们同时系统性地记录了裁判的三类偏置：**位置偏置**（先出现的答案占优）、**长度偏置**（更长的答案得分更高）、**自偏好**（GPT-4 裁判偏爱 GPT-4 的文风）。工程对策由此定型：交换答案顺序取平均、按长度归一、judge 与 candidate 异源。这套控制变量法至今仍是所有用 judge 的 eval 的标配。
-- **Process Reward Models：把分数拆到每一步**。结果奖励（ORM）只知道"最终错了"，不知道错在哪步。OpenAI 的 *Let's Verify Step by Step*（Lightman et al., 2023）用人工标注 800K 步级正确性标签（PRM800K）证明：过程监督训练出的 PRM 在数学上显著优于结果监督，且能抑制"碰巧答对的错误推理"。Math-Shepherd（2023-12）随后解决了标注贵的问题：**用 MC rollout 自动生成步级标签**——从某一步出发随机续写 N 次，最终答对率高则该步大概率正确。PRM 对 Agent 工程的意义在 Ch10.5 展开：当每步都有分数，"在线回滚劣质动作"的自愈闭环才有了信号源。
+- **Process Reward Models：把分数拆到每一步**。结果奖励（ORM）只知道"最终错了"，不知道错在哪步。OpenAI 的 *Let's Verify Step by Step*（Lightman et al., 2023）用人工标注 800K 步级正确性标签（PRM800K）证明：过程监督训练出的 PRM 在数学上显著优于结果监督，且能抑制"碰巧答对的错误推理"。Math-Shepherd（2023-12）随后解决了标注贵的问题：**用 MC rollout 自动生成步级标签**——从某一步出发随机续写 N 次，最终答对率高则该步大概率正确。PRM 对 Agent 工程的意义在 10.5 展开：当每步都有分数，"在线回滚劣质动作"的自愈闭环才有了信号源。
 
 > 脉络总结：评测正从"结果对不对"（pass@k）走向"过程合不合理"（每步工具选择是否必要、token 是否浪费、是否走捷径）。这与 trace 记录的粒度直接耦合——**没有过程数据，过程评测无从谈起**；反过来说，PRM 在线化的前提是把 trace 记到步级。
 
@@ -82,11 +84,11 @@ Session Trace（审计级）
 
 最小完备集 = 上面加粗字段。缺一项的典型事故：
 
-- 缺 `tools hash`：无法解释"为何这轮 cache 全 miss"（工具清单变了 → 前缀断点失效，见 Ch5.6）；
+- 缺 `tools hash`：无法解释"为何这轮 cache 全 miss"（工具清单变了 → 前缀断点失效，见 [Ch5.2.4](./ch05-context.md#_5-2-4-缓存-断点稳定性与命中实验)）；
 - 缺 `stop_reason`：无法区分"模型认为完成"与 `max_tokens` 截断，重试策略失据；
 - 缺子 Agent 归因（parentSessionId）：多 Agent 场景下成本无法分摊到具体子任务。
 
-### 10.2.2 用量归一：live vs cumulative（承接 7.2.5）
+### 10.2.2 用量归一：live vs cumulative（承接 [Ch7.2.5](./ch06-session.md#_7-2-5-live-vs-cumulative-用量分账原则)）
 
 ```rust
 // Grok xai-grok-sampler/src/lib.rs apply_terminal_event_overrides() 思想
@@ -101,6 +103,8 @@ fn normalize_usage(raw: Usage, context_details: ContextDetails) -> NormalizedUsa
 ```
 
 为什么必须分离：服务端 loop 工具（web_search 等）会让 API 返回的 `total_tokens` 包含搜索内部消耗，若直接用它做 `should_auto_compact(total, window)` 判断，会在上下文远未满时误触发压缩。
+
+> 词汇债券认领（定义见 [Ch1 §1.5](./ch01-landscape.md#_1-5-五个贯穿全书的设计模式-词汇债券)）：这段 normalize 同时兑付两笔债券——`input/output/cached` 作为累计底账保持「只增不改」（锚点 Grok `xai-chat-state/src/actor/state.rs:163 UsageLedger`）；`total_live` 是按 `context_details` 重算的当前视图，底账不动、视图随查询变，即「投影而非改写」在用量域的对应物（锚点 `xai-grok-sampler/src/lib.rs apply_terminal_event_overrides()`）。
 
 ### 10.2.3 成本分账公式
 
@@ -122,7 +126,7 @@ Claude 的 `tengu_*` 事件把 `cache_creation/cache_read/input/output` 四项�
 | 家 | Trace 载体 | 记录粒度 | 评测设施 | 特色 |
 |----|-----------|---------|---------|------|
 | Claude | `tengu_auto_compact_succeeded/tengu_compact_ptl_retry/tengu_prompt_cache_break` + headlessProfilerCheckpoint | hop 级：assistantText/toolCalls/tokenUsage/compactionEvent | fixtures/ + tests/ 目录 | cache 断裂检测哈希 system+tools |
-| Codex | `codex-otel`（原生 OpenTelemetry） | turn/request 级 span | codex-rs/e2e/benchmark + book 全套内部文档 | 八家中唯一 OTel 标准 |
+| Codex | `codex-otel`（原生 OpenTelemetry） | turn/request 级 span | codex-rs/e2e/benchmark + book 全套内部文档 | 九家中唯一 OTel 标准 |
 | Grok | `UsageLedger`(prompt_usage/session_usage 分账) + harness_trace_buffer → harness_trace_turns | turn 级 + 子 Agent 发现(turn_{N}) | SOURCE_REV/ 第三方审查痕迹 | live/cumulative 强制分账 |
 | DeepSeek | session-stats/session-telemetry/session-title 包 | waterfall 事件级(agent/pre-step 等) | BENCHMARK.md + vitest 双配置 | telemetry 即插件(Cordis) |
 | OpenCode | `EventV2Bridge` + BackgroundJob | PartUpdated/PartDelta 流式粒度 | 无公开 bench，靠 STATS.md 运营数据 | UI 实时渲染即消费方 |
@@ -130,13 +134,17 @@ Claude 的 `tengu_*` 事件把 `cache_creation/cache_read/input/output` 四项�
 | Claw | TranscriptStore entries | entry 级 | parity_audit.py 对齐上游 | 以"上游行为对齐"为评测 |
 | Qwen-Agent | log.py logger + parallel_executor 计时 | 函数级 print/logging | benchmark/ 目录(官方评测脚本) | 最朴素：logger.warning 即 trace |
 
+> 注：本表实际对证八家；Hermes 未列入——其观测与审计点（轨迹压缩、`StreamingContextScrubber` 边流边脱敏）随安全与自愈主题在 [Ch11](./ch10-reliability.md) 11.3.1 总表处理，源码锚点见 [附录 B](./appendix-sources.md)。
+
 ### 10.3.2 Qwen-Agent 对照：库形态的最小可观测
 
 `qwen_agent/log.py` 只是一行 `logger = logging.getLogger(...)` 封装；工具失败时 `_call_tool`（`agent.py:196-203`）拼一段含 traceback 的 error_message 作为字符串返回给模型。对比之下：
 
 - **优点**：零依赖、零侵入，宿主应用用自己的 logging/APM 体系接住；
 - **缺点**：无结构化字段（token 数要自己从响应里抠）、无 parent 归因、无成本分账；
-- **启示**：可观测性是产品责任而非库责任的又一例证（同 Session，见 7.3.2）。若要在 Qwen-Agent 上建 eval，得先包一层 `BaseChatModel.chat()` 拦截器补齐 usage 记录。
+- **启示**：可观测性是产品责任而非库责任的又一例证（同 Session，见 [Ch7.3.2](./ch06-session.md#_7-3-2-qwen-agent-库形态-vs-产品形态的分水岭)）。若要在 Qwen-Agent 上建 eval，得先包一层 `BaseChatModel.chat()` 拦截器补齐 usage 记录。
+
+> 词汇债券认领（定义见 [Ch1 §1.5](./ch01-landscape.md#_1-5-五个贯穿全书的设计模式-词汇债券)）：一行 `logger` 封装是「最小 Harness 税」的兑付——删掉 `qwen_agent/log.py` 最小闭环照跑，观测税近乎为零；`_call_tool`（`qwen_agent/agent.py:196-203`）把 traceback 归一为 error_message 字符串回填给模型，则是「故障边界」的朴素版——失败在 Tools 层归一，Loop 无需感知下层的异常形态。
 
 ### 10.3.3 Claude 的 promptCacheBreakDetection：为性能而生的观测
 
@@ -183,14 +191,14 @@ LLM-as-Judge 用于开放任务时必须控制三类偏置（位置/长度/自�
 ## 10.5 未来方向
 
 1. **OTel GenAI 语义约定成熟**：gen_ai.* attribute 标准化后，Agent trace 将像 HTTP span 一样跨厂商互通，Codex 的先行优势会变成行业默认。
-2. **过程奖励驱动运行时**：PRM 不止用于离线评测——在线给每个工具调用实时打分，低于阈值的动作自动回滚重试（与 Ch11 自愈层合流）。
-3. **成本感知调度**：UsageLedger 反馈给 Model Router（Ch8 未来方向），简单子任务自动降级到便宜模型，预算成为一等调度约束。
+2. **过程奖励驱动运行时**：PRM 不止用于离线评测——在线给每个工具调用实时打分，低于阈值的动作自动回滚重试（与 [Ch11](./ch10-reliability.md) 自愈层合流）。
+3. **成本感知调度**：UsageLedger 反馈给 Model Router（[Ch8](./ch07-model.md) 未来方向），简单子任务自动降级到便宜模型，预算成为一等调度约束。
 4. **评测环境标准化**：WebArena/Tau-bench 的"自托管环境"思路与 MCP 结合——eval harness 本身就是一个 MCP server，任何 Agent 可插拔参评。
 5. **Qwen-Agent 类库的可观测插件化**：宿主注入 tracer 即获得全套结构化 trace，可能成为框架库的事实接口（类似 Python logging 的 handler 模式）。
 
 ## Lab 10：给最小 Agent 补上 Trace + 成本分账（约 100 行 TS）
 
-**目标**：在 Lab 7 的 SessionStore 之上，实现三层 trace 与 live/cumulative 分离。
+**目标**：在 [Lab 7](./ch06-session.md) 的 SessionStore 之上，实现三层 trace 与 live/cumulative 分离。
 
 ```ts
 // lab/trace.ts 骨架
@@ -223,7 +231,7 @@ function cost(t: TurnRecord, price): number { /* 按 10.2.3 公式 */ }
 - [ ] 能解释为什么 Qwen-Agent 的 logger 方案在库形态下是合理的
 
 **思考题**：
-1. 若让你为八家的 trace 字段做一张超集 schema，哪些字段必有争议？怎么调和？
+1. 若让你为九家的 trace 字段做一张超集 schema，哪些字段必有争议？怎么调和？
 2. 过程奖励模型在线化后，"刷过程分"的新型 hack 会长什么样？
 3. 你的 Agent 每月成本突增 40%，按本章的 trace 设计给出你的排查顺序。
 

@@ -1,11 +1,17 @@
 # 第7章 Session / Trace / 持久化
 
-> Session 解决“记住”、Trace 解决“说清”、持久化解决“不丢”。七家的共识是：**可重放（replay）优于可恢复（restore），追加（append）优于覆盖，可观测必须内建**。—— 本章把 Session 从“一个 `Vec<Message>`”还原为“一条 WAL”，把 Trace 从“打日志”还原为“分布式追踪”，逐行对证七家如何让 `--resume` 可信、让 `fork` 可分支、让崩溃不带毒。
+> 回到统摄公式 **`Agent = Model + Harness`**（[Ch1](./ch01-landscape.md)）：Model 只在被调用的瞬间存在，跨调用、跨进程、跨崩溃的连续性全是 Harness 的职责。在 [Ch2](./ch02-common-model.md) 的六件套中，本章负责的正是 **Session** 这一件——它把不变量 I1（`Session.append` 为唯一写路径）落成一条可重放的 WAL，并让 Trace 成为这条 WAL 的可观测投影。
+>
+> Session 解决“记住”、Trace 解决“说清”、持久化解决“不丢”。九家的共识是：**可重放（replay）优于可恢复（restore），追加（append）优于覆盖，可观测必须内建**。本章把 Session 从“一个 `Vec<Message>`”还原为“一条 WAL”，把 Trace 从“打日志”还原为“分布式追踪”，逐行对证九家如何让 `--resume` 可信、让 `fork` 可分支、让崩溃不带毒。
+
+**本章目标**：读完能（1）沿 Event Sourcing→WAL→jsonl/SQLite/Journal 的 lineage 复述 Session 的四次位移；（2）手写“事件类型全集 + I1–I3 三不变量”，并对比 turn 边界三方案（预写/版本号/偏移量）的恢复代价；（3）对照九家源码锚点逐行解释 `--resume`、`fork`、崩溃自愈的实现与“不这样写会怎样”；（4）在 jsonl / SQLite / Journal 双轨三选一时给出量化权衡；（5）对 Session Federation 与 Time-travel debugging 等五个前沿方向提出可验证假设。
+
+**阅读方式**：配合 `appendix-sources.md` 的锚点表，左侧开源码、右侧读本章；7.2.3 的崩溃自愈时序与 7.3.2 的 Qwen-Agent 反例是本章最高频追问点，建议对照源码精读。每节后的 `> 反例` 与章末思考题用于自检“真懂”。
 
 ## 本章图谱
 
 ```
-历史脉络 ──► 原理抽象 ──► 七家对证 ──► 权衡取舍 ──► 未来演进
+历史脉络 ──► 原理抽象 ──► 九家对证 ──► 权衡取舍 ──► 未来演进
 Fowler 05    Session.append  Claude/Codex  jsonl vs     Federation
 WAL/LSM/rep  turn边界/幂等  Grok/DeepSeek  SQLite vs   Time-travel
 jsonl→SQLite history_version OpenCode/Pi   Journal      GC/压缩
@@ -45,7 +51,7 @@ I2  Total Order：   log 有全序（LSN / history_version / offset），消费�
 I3  Deterministic Fold： 同一 log 序列 fold 出同一状态（幂等、无副作用的 replay）
 ```
 
-七家 Session 的分化，本质是对 I1-I3 的不同“持久化 + 排序”实现（见 7.2）。
+九家 Session 的分化，本质是对 I1-I3 的不同“持久化 + 排序”实现（见 7.2）。
 
 ### 7.1.2 演进：会话在 ChatGPT 2022 后的三次位移
 
@@ -164,7 +170,7 @@ PartTable:     | session_id | message_id | parent_id | part_type | content |
 
 #### 失败案例：仅可恢复的代价
 
-- **Claw 早期** `rust/crates/runtime/src/session.rs Session{version,messages}` 直写 `~/.claw/sessions/<uuid>.json`，无 log，仅 snapshot。后果：进程在 `assistant tool_calls` 与 `tool_result` 之间崩溃，snapshot 残留 `dangling tool_calls`，下次启动直接 PTL（见 7.2.5 自愈）。
+- **Claw 早期** `rust/crates/runtime/src/session.rs Session{version,messages}` 直写 `~/.claw/sessions/<uuid>.json`，无 log，仅 snapshot。后果：进程在 `assistant tool_calls` 与 `tool_result` 之间崩溃，snapshot 残留 `dangling tool_calls`，下次启动直接 PTL（见 7.2.3 自愈）。
 - **单一 snapshot 的 fork 失效**：若仅存快照，`fork` 只能从最新状态分叉，无法“回到 3 轮前重试另一种解法”——这正是 `plan` 模式与 `branch/navigation`（Pi `docs/book/14-branch-navigation.md`）要解决的。
 
 ---
@@ -173,7 +179,7 @@ PartTable:     | session_id | message_id | parent_id | part_type | content |
 
 ### 7.2.1 Session.append：唯一写路径与事件即日志
 
-Event Sourcing 落到 Agent 上，就是 `append(eventType)` 成为唯一写路径，任何读取（投影/恢复/fork）都是 log 的 fold：
+Event Sourcing 落到 Agent 上，就是 `append(eventType)` 成为唯一写路径，任何读取（投影/恢复/fork）都是 log 的 fold——这正是 [Ch1](./ch01-landscape.md) 立下的「只增不改」债券在 Session 层的兑付：Claude `QueryEngine.ts:451 recordTranscript` 预写、DeepSeek `Session.append(eventType)`、Grok `Journal.append(ConversationItem)`，是同一模式在三种介质上的落地：
 
 ```ts
 // DeepSeek packages/session/*: 事件类型全集（各家大同小异）
@@ -186,7 +192,7 @@ type SessionEvent =
   | { t: 'request/header' | 'request/context' };     // 归一去重后入 log
 ```
 
-三条不变量（对应 Ch2 的 I1）：
+三条不变量（对应 [Ch2](./ch02-common-model.md) 的 I1）：
 
 1. **全序**：每个事件带单调 `seq`/`Revision`，流式 chunk 不乱序；
 2. **幂等 fold**：同一 log 重放两遍结果一致——`request/header|context` 需去重（DeepSeek `canonicalHeader/headerEquals`）；
@@ -194,7 +200,7 @@ type SessionEvent =
 
 ### 7.2.2 turn/start 边界不丢的三种实现
 
-"崩溃后从哪个事件续跑"是持久化的核心难题。八家给出三种等价但成本不同的方案：
+"崩溃后从哪个事件续跑"是持久化的核心难题。九家给出三种等价但成本不同的方案：
 
 ```
 方案A 预写（write-ahead）：    Claude —— submitMessage 先写 user 消息再调模型
@@ -224,7 +230,9 @@ Grok 的 offset 设计最精巧：`turn_capture.pre_replacement_messages` 在 co
   → log 变为合法对话，模型可继续推理而非 PTL
 ```
 
-> 反例（无自愈的后果）：Claw 早期 snapshot 直写，残留悬垂 `tool_calls`；下次请求把非法历史发给 API → `prompt_too_long` 或 400。这正是 Ch11 自愈层的存在理由。
+> 「故障边界」：自愈即归一化——`repair_dangling_tool_calls()` 为悬垂 tool_calls 补合成 `tool_result(is_error=true)`（Grok `ChatState::new()` 启动路径），把"崩溃残留"这一存储层异常在 Session 层归一为合法对话，模型层永远看不到下层失败的原始形态。不设这道边界的代价如下。
+
+> 反例（无自愈的后果）：Claw 早期 snapshot 直写，残留悬垂 `tool_calls`；下次请求把非法历史发给 API → `prompt_too_long` 或 400。这正是 [Ch11](./ch10-reliability.md) 自愈层的存在理由。
 
 ### 7.2.4 分支：idMap 重映射算法
 
@@ -244,7 +252,7 @@ function fork(sid, mid?) {
 
 ### 7.2.5 live vs cumulative：用量分账原则
 
-Trace 里同一个 `total_tokens` 有两种语义，混用会导致压缩误触发或账单错误（Ch10 展开）：
+Trace 里同一个 `total_tokens` 有两种语义，混用会导致压缩误触发或账单错误（[Ch10](./ch09-observability.md) 展开）：
 
 ```
 live        = 当前上下文实际长度       → 驱动 should_auto_compact、/context 进度条
@@ -268,9 +276,11 @@ Grok 的教训最典型：服务端 loop 工具（`web_search/x_search`）会让
 | Claw | `src/session_store.py StoredSession` | JSON 直写（原型级） | 无 | 无自愈 | 无边界保障 |
 | **Qwen-Agent** | **核心库无持久层**：`messages` 由调用方持有并传入 `run()`（`agent.py:78`） | 无（会话文件仅在 `qwen_server` GUI 层） | 仅 `copy.deepcopy(messages)` 防御性拷贝（`agent.py:91`），无 fork | 工具异常转字符串回填（`_call_tool` `agent.py:178-203`），无崩溃自愈 | 无 |
 
+> 注：本表未列 Hermes——其会话层以 SQLite FTS5 做跨会话检索（`agent/memory_manager.py`），无独立的 fork/自愈设计；专门处理见 [Ch1 §1.1 类比表](./ch01-landscape.md) 与 [Ch6 6.3.1](./ch05b-memory.md)。
+
 ### 7.3.2 Qwen-Agent：库形态 vs 产品形态的分水岭
 
-Qwen-Agent 是八家中唯一的"纯框架库"：它把六件套中的 **Session 整件留白**，交还给宿主应用。这个反例的价值在于划清了边界——
+Qwen-Agent 是九家中唯一的"纯框架库"：它把六件套（[Ch2](./ch02-common-model.md)）中的 **Session 整件留白**，交还给宿主应用。这个反例的价值在于划清了边界——
 
 ```
 库形态（Qwen-Agent / pi 的 agent 包）：
@@ -298,7 +308,7 @@ Qwen-Agent 是八家中唯一的"纯框架库"：它把六件套中的 **Session
 
 ### 7.3.4 Grok：Journal + Actor 的强一致组合
 
-Actor 单 task 独占 `ChatState`（Ch3），持久化由独立的 `xai-sqlite-journal` 承担——内存数组与磁盘 journal 通过 `turn_start_offset` 对齐。这形成"两级 log"：内存 `Vec<ConversationItem>` 服务热路径（bulk 切片投影），SQLite journal 服务冷恢复（逐条 replay）。崩溃后 `ChatState::new()` 从 journal 重建内存态并跑自愈，两级各司其职。
+Actor 单 task 独占 `ChatState`（[Ch3](./ch03-loop.md)），持久化由独立的 `xai-sqlite-journal` 承担——内存数组与磁盘 journal 通过 `turn_start_offset` 对齐。这形成"两级 log"：内存 `Vec<ConversationItem>` 服务热路径（bulk 切片投影），SQLite journal 服务冷恢复（逐条 replay）。崩溃后 `ChatState::new()` 从 journal 重建内存态并跑自愈，两级各司其职。内存态全程是 journal 的物化视图——「投影而非改写」：compaction 改写前由 `turn_capture.pre_replacement_messages` 暂存旧段落（7.2.2），视图可撤销、可重建，底账 journal 始终只增不改。
 
 ## 7.4 结论权衡
 
@@ -335,7 +345,7 @@ Actor 单 task 独占 `ChatState`（Ch3），持久化由独立的 `xai-sqlite-j
 1. **Session Federation（跨设备同步）**：本地 log 如何与云端任务（Codex cloud-tasks、CCR 远程 agent）双向同步？CRDT/Merkle-DAG 式 merge 将从论文兴趣变成产品刚需，Pi 的 session-tree 与 OpenCode 的 share_url 是雏形。
 2. **Time-travel debugging for Agents**：Redux DevTools 之于前端 = Trace replay 之于 Agent。"跳到第 k 个工具调用、改输入、从该点分叉重放"会把 fork 从功能变成调试器原语。
 3. **Log GC 与分层归档**：全量可重放的代价是无限增长。未来会出现"热 log（近 N turn）/温快照（compaction 边界）/冷归档（对象存储+摘要索引）"三级，DeepSeek 的 projection-cache 已在做温层。
-4. **Session–Memory 合流**：Memory 系统（Ch6）成熟后，Session log 会分化出"事实层"（供 memory ingestion）与"过程层"（供 replay），两层不同 retention 策略——FadeMem 式衰减可能直接作用在冷 log 上。
+4. **Session–Memory 合流**：Memory 系统（[Ch6](./ch05b-memory.md)）成熟后，Session log 会分化出"事实层"（供 memory ingestion）与"过程层"（供 replay），两层不同 retention 策略——FadeMem 式衰减可能直接作用在冷 log 上。
 5. **库形态的标准化回归**：MCP 统一了工具，下一个被标准化的可能是"会话导出格式"（类 memorywire 的 sessionwire）：Qwen-Agent 这类库只要实现 import/export 即可获得完整 Session 能力，而不必自带持久层。
 
 ## Lab 7：最小 append-only Session（约 120 行 TS）

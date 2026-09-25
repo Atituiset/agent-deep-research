@@ -1,6 +1,6 @@
 # 第9章 多 Agent 与任务规划
 
-> 单 Agent 解决"执行"，多 Agent 解决"分工"。七家的共识是：**任务规划是显式状态容器，子 Agent 是隔离的执行单元，plan 必须落盘为文件而非仅存于对话消息**。本章把"为什么需要多 Agent、怎么隔离、怎么通信、怎么规划"四问一次剖开。
+> 回到统摄公式 **Agent = Model + Harness**：前面各章已逐件拆解 Harness 的六件套（Prompt / Loop / Tools / Context / Session / Model，见[第 2 章](./ch02-common-model.md)），本章负责的是 Harness 的**多 Agent 维度**——当一份六件套不够用时，如何把 Loop 复制成隔离的子 Agent 实例、把规划从 Prompt 里抽出来做成显式状态容器、用 worktree 与权限把 Tools / Session 的副作用边界画清。单 Agent 解决"执行"，多 Agent 解决"分工"。九家的共识是：**任务规划是显式状态容器，子 Agent 是隔离的执行单元，plan 必须落盘为文件而非仅存于对话消息**。本章把"为什么需要多 Agent、怎么隔离、怎么通信、怎么规划"四问一次剖开。
 
 **本章目标**：读完能（1）按时间轴复述多 Agent 与任务规划从 CAMEL 到多 Agent 实证之争的演进与每次跃迁的理由；（2）画出 Planner 的显式状态机与三类编排拓扑的时序图；（3）对照各家源码锚点解释"worktree 何时必要、何时禁止嵌套、plan 为何必须是 artifact"；（4）在单 Agent / Orchestrator-Worker / Swarm / Hierarchical 四选一时给出量化权衡；（5）对 Agent OS 与信用分配等五个前沿方向提出可验证假设。
 
@@ -45,9 +45,10 @@
            More Agents (2024-02) 采样投票可扩展 → Anthropic 多 Agent 研究系统 (2025-06)
            └── 首次给出生产级量化：研究类任务提速 ~90%，代价 token ~15×；Cognition 同月唱反调
                 │
-2024–2026  七家生产实现（本书对象）
+2024–2026  九家生产实现（本书对象，此处列六家代表）
             Claude AgentTool(60+ 类型) / Codex collaboration-mode / Grok discovery + fast-worktree
             DeepSeek Cordis Scope / OpenCode task.ts / Pi subagents → "隔离模型"成为分水岭
+            （Qwen-Agent 对照组 / Claw 占位 / Hermes async_delegation，见 9.3 各表注记）
 ```
 
 | 年份 | 论文/系统 | 会议/载体 | 多 Agent 形态 | 一句话核心贡献 |
@@ -57,10 +58,9 @@
 | 2023-08 | **AutoGen** | Microsoft, arXiv:2308.08155 | `ConversableAgent` + `GroupChatManager` + `CodeExecutor` | 首次把多 Agent 做成可编程框架，支持人机共编与工具执行；`GroupChat` 引入 speaker selection 策略 |
 | 2023-10 | **CrewAI** | 开源 (João Moura) | `Crew → Agent(role,goal,backstory) → Task` 声明式 | 把 AutoGen 的"图灵完备对话"收敛为"任务清单"，易用性最高，代价是难以表达复杂分支与回退 |
 | 2024-02 | **LangGraph** | LangChain | `StateGraph{ nodes, edges, checkpoint }` 有状态图 | 首次把多 Agent 建模为"可持久化、可中断、可回放的状态图"，支持 `interrupt_before/after` 与时间旅行调试 |
-| 2024-02 | **LangGraph** | LangChain | `StateGraph{ nodes, edges, checkpoint }` 有状态图 | 首次把多 Agent 建模为"可持久化、可中断、可回放的状态图"，支持 `interrupt_before/after` 与时间旅行调试 |
 | 2024-2025 | **多 Agent 实证之争** | More Agents (arXiv:2402.05120)；Anthropic 工程博客 2025-06；Cognition 2025-06 | 采样投票扩展律 / Orchestrator-Worker 生产实测 / 反方檄文 | 首次给出量化答案：并行搜集类研究任务多 Agent 大幅领先（Anthropic：提速约 90%，代价 ~15× token）；强耦合编辑任务共享上下文优于分工（Cognition） |
 
-> **演进主线**：`角色涌现（CAMEL）→ 流程固化（MetaGPT SOP）→ 可编程对话（AutoGen）→ 声明式任务（CrewAI）→ 状态图（LangGraph）→ 实证分水岭（More Agents / Anthropic vs Cognition）→ 生产隔离（七家）`。每一步都在回答：协作的"契约"应该写在哪里——prompt 里、SOP 文档里、代码里、还是状态图里。
+> **演进主线**：`角色涌现（CAMEL）→ 流程固化（MetaGPT SOP）→ 可编程对话（AutoGen）→ 声明式任务（CrewAI）→ 状态图（LangGraph）→ 实证分水岭（More Agents / Anthropic vs Cognition）→ 生产隔离（九家）`。每一步都在回答：协作的"契约"应该写在哪里——prompt 里、SOP 文档里、代码里、还是状态图里。
 
 ### 9.1.2 逐篇精读：多 Agent 的五次形态变化与一次实证清算
 
@@ -84,7 +84,7 @@
 
 **证据**：在小型项目生成上，MetaGPT 报告显著低于人类团队的 token 成本即可产出完整 PRD+设计+代码三件套，HumanEval 类基准上超过当时主流单 Agent 与对话式框架；更重要的是错误传播分析——自由对话的错误会级联放大，而 SOP 的 schema 校验能在接口处拦截。
 
-**遗产**："plan 是 artifact 而非对话消息"由此成为工程共识——七家的 plan 文件落盘（Ch9.2.1 形态3）、PRD/设计文档先行，都是这条思路。局限同样明显：SOP 硬编码导致灵活性差，超出预设流程的任务就傻眼——这正是 AutoGen 要解放的。
+**遗产**："plan 是 artifact 而非对话消息"由此成为工程共识——九家的 plan 文件落盘（见 [9.2.1 形态3](#_9-2-1-planner-显式状态容器的三种形态)）、PRD/设计文档先行，都是这条思路。局限同样明显：SOP 硬编码导致灵活性差，超出预设流程的任务就傻眼——这正是 AutoGen 要解放的。
 
 #### AutoGen (2023)：把协作做成编程语言——Conversable Agent 与对话编程
 
@@ -94,11 +94,11 @@
 
 **证据**：论文以数学解题、检索增强问答、决策制定等六类应用展示同一套原语覆盖从双 Agent 到人机混合的广谱场景；后续社区生态（数百个示例应用）成为它影响力的更好证明。
 
-**遗产**：七家生产实现里的"子 Agent 即配置对象"、工具注入、人工审批钩子，都能看到 Conversable Agent 的影子。代价是自由度过高——对话可能发散，调试困难，这个痛点由 CrewAI 和 LangGraph 从两个方向收敛。
+**遗产**：九家生产实现里的"子 Agent 即配置对象"、工具注入、人工审批钩子，都能看到 Conversable Agent 的影子。代价是自由度过高——对话可能发散，调试困难，这个痛点由 CrewAI 和 LangGraph 从两个方向收敛。
 
 #### CrewAI → LangGraph (2023–2024)：易用性与可控性的两极收敛
 
-两者都是对 AutoGen 的收敛性反动，方向却相反。**CrewAI** 把自由对话压缩成声明式任务清单：`Crew → Agent(role, goal, backstory) → Task` 三级对象，顺序/层级执行，开发者像排班一样指派工作——上手十分钟，但复杂分支与回退难以表达。**LangGraph** 则反向加码可控性：放弃"对话即编排"，把整个多 Agent 系统**显式建模为状态图**（StateGraph：节点=Agent 或函数，边=转移条件），原生支持 cycle（迭代修正）、checkpoint（每步持久化）、`interrupt_before/after`（人在环中断点）与时间旅行调试（回放任意历史状态）。LangGraph 的 checkpoint 思想对本书尤其重要——它是 Ch7 Session 持久化与 Ch3 可恢复 Loop 在框架侧的同构物。两者的分化本质是一个问题的两面：**协作的控制流该藏在运行时里，还是该摊开成数据结构？**生产界的回答偏向后者——可观测、可恢复、可审计，这三样恰好是 Ch7/Ch10 的全部主题。
+两者都是对 AutoGen 的收敛性反动，方向却相反。**CrewAI** 把自由对话压缩成声明式任务清单：`Crew → Agent(role, goal, backstory) → Task` 三级对象，顺序/层级执行，开发者像排班一样指派工作——上手十分钟，但复杂分支与回退难以表达。**LangGraph** 则反向加码可控性：放弃"对话即编排"，把整个多 Agent 系统**显式建模为状态图**（StateGraph：节点=Agent 或函数，边=转移条件），原生支持 cycle（迭代修正）、checkpoint（每步持久化）、`interrupt_before/after`（人在环中断点）与时间旅行调试（回放任意历史状态）。LangGraph 的 checkpoint 思想对本书尤其重要——它是 [Ch7](./ch06-session.md) Session 持久化与 [Ch3](./ch03-loop.md) 可恢复 Loop 在框架侧的同构物。两者的分化本质是一个问题的两面：**协作的控制流该藏在运行时里，还是该摊开成数据结构？**生产界的回答偏向后者——可观测、可恢复、可审计，这三样恰好是 [Ch7](./ch06-session.md)/[Ch10](./ch09-observability.md) 的全部主题。
 
 #### 多 Agent 值不值？(2024–2025)：从框架竞赛到实证清算
 
@@ -108,7 +108,7 @@
 - **Anthropic《How We Built Our Multi-Agent Research System》（2025-06）**：第一个生产级正方证词。Orchestrator-Worker 让研究类任务的评测表现较单 Agent 提升 **约 90%**——因为"先并行撒网搜集、再汇总"天然匹配多 Agent；但账单同样惊人：多 Agent 系统 token 消耗约为普通聊天的 **15×**、单 Agent 的 4×，且需要专门教 orchestrator 如何委派、如何防止 worker 重复劳动。
 - **Cognition《Don't Build Multi-Agents》（同月）**：最锋利的反方檄文。两条原则——①**共享完整上下文**：分头行动的 Agent 各持残缺语境，必然做出互相冲突的隐含决策；②**行动携带隐含决策**：编辑 A 文件的方式已经暗含了对 B 文件的假设，而这些假设无法通过消息同步。结论：当前模型做不好真·多 Agent 编码，推荐单线程线性 Agent + 上下文压缩（Devin 的路线）。
 
-三份合读的结论不是站队，而是**分界条件**：任务可并行且子任务弱耦合（搜索、调研、批量探索）→ 多 Agent 吃肉；任务强耦合、动作不可逆（编码、重构）→ 单线程保平安。这张判决书将在 9.1.4 的拓扑选型与 9.3 的源码对证中反复引用——七家"Orchestrator-Worker 为上限、禁嵌套、子代理继承父上下文投影"的三件套，就是同时吸收三方后的工程合成。
+三份合读的结论不是站队，而是**分界条件**：任务可并行且子任务弱耦合（搜索、调研、批量探索）→ 多 Agent 吃肉；任务强耦合、动作不可逆（编码、重构）→ 单线程保平安。这张判决书将在 9.1.4 的拓扑选型与 9.3 的源码对证中反复引用——九家"Orchestrator-Worker 为上限、禁嵌套、子代理继承父上下文投影"的三件套，就是同时吸收三方后的工程合成。
 
 ### 9.1.3 规划 Lineage：从隐式 ReAct 到显式 Skill 库
 
@@ -133,7 +133,7 @@
            └── 首次把规划的产出物（skill）做成"可积累、可检索、可复用的库"
                 │  Loop 从单任务变为终身学习：成功轨迹 → skill → 下次任务的 plan 素材
                 │
-2024–2026  七家生产规划
+2024–2026  九家生产规划
            TodoWrite / task.txt / Plan artifact / Workflow / Goal 四级
            └── 规划从"prompt 技巧"彻底变为"工具 + 文件 + 状态机"
 ```
@@ -145,9 +145,9 @@
 | 2023-05 | **ReWOO** | 先产完整 plan（含参数），再批量执行，token 效率提升约数倍 | 证明"规划与执行解耦"可省 token；但执行期无法根据中间结果动态调整 |
 | 2023-05 | **Voyager** | `Skill Library`：成功代码固化为可检索技能，自动课程驱动 | 首次把规划产出物"资产化"，plan 不再是一次性文本而是可复用知识 |
 
-**从 ReAct 到 ReWOO：一次"先想完再做"的结构性反叛**。ReAct 的规划藏在每一步的 Thought 里（机制见 Ch3.1.2），优点是灵活、缺点是三重浪费：每步都要重新采样整个上下文（贵）、中间观察反复进 prompt（更贵）、且 plan 只存在于生成过程中——人类既不能提前审查，也不能事后审计。Plan-and-Solve 提示法与 BabyAGI 这类工程实现把方向倒过来：**先用一次强模型调用产出完整计划，再逐项执行**，计划成为可 review 的中间产物。ReWOO（Reason Without Observation）把这个思想推到极致并给出了量化论证：Planner 一次性产出**变量化的 DAG 计划**——`#E1 = Search[谁写了 X]`、`#E2 = Lookup[#E1 的国籍首都]`——后续步骤引用变量占位而非真实观察值；Worker 按拓扑序批量执行，Solver 最后整合。因为执行阶段不再把中间观察塞回大上下文，token 消耗较交替式下降约一个数量级内的数倍，且对观察噪声更鲁棒。代价同样明确：**计划在执行前就冻结了**，中途发现 #E1 的结果出乎意料也无法改道——这个"动态性 vs 效率"的两难，正是七家最终选择折中方案（TodoWrite 可增量更新 + hop 内仍走 ReAct）的直接原因。
+**从 ReAct 到 ReWOO：一次"先想完再做"的结构性反叛**。ReAct 的规划藏在每一步的 Thought 里（机制见 [Ch3.1.2](./ch03-loop.md#_3-1-2-逐篇精读-每篇论文如何-长出-一种-loop-形态)），优点是灵活、缺点是三重浪费：每步都要重新采样整个上下文（贵）、中间观察反复进 prompt（更贵）、且 plan 只存在于生成过程中——人类既不能提前审查，也不能事后审计。Plan-and-Solve 提示法与 BabyAGI 这类工程实现把方向倒过来：**先用一次强模型调用产出完整计划，再逐项执行**，计划成为可 review 的中间产物。ReWOO（Reason Without Observation）把这个思想推到极致并给出了量化论证：Planner 一次性产出**变量化的 DAG 计划**——`#E1 = Search[谁写了 X]`、`#E2 = Lookup[#E1 的国籍首都]`——后续步骤引用变量占位而非真实观察值；Worker 按拓扑序批量执行，Solver 最后整合。因为执行阶段不再把中间观察塞回大上下文，token 消耗较交替式下降约一个数量级内的数倍，且对观察噪声更鲁棒。代价同样明确：**计划在执行前就冻结了**，中途发现 #E1 的结果出乎意料也无法改道——这个"动态性 vs 效率"的两难，正是九家最终选择折中方案（TodoWrite 可增量更新 + hop 内仍走 ReAct）的直接原因。
 
-> ** lineage 会合点**：ReWOO 的"批量规划" + Voyager 的"技能库"（机制精读见 Ch3.1.2）→ LangGraph 的"图状态" → 七家的"TodoWrite/task/plan 文件"三件套。**共识：plan 必须是可持久化、可 diff、可回滚的 artifact，而非对话消息**。
+> ** lineage 会合点**：ReWOO 的"批量规划" + Voyager 的"技能库"（机制精读见 [Ch3.1.2](./ch03-loop.md#_3-1-2-逐篇精读-每篇论文如何-长出-一种-loop-形态)）→ LangGraph 的"图状态" → 九家的"TodoWrite/task/plan 文件"三件套。**共识：plan 必须是可持久化、可 diff、可回滚的 artifact，而非对话消息**。
 
 ### 9.1.4 编排拓扑 lineage：三种范式的分化
 
@@ -170,7 +170,7 @@ Hierarchical (分层)
    树状委托：Root → Sub-agent → Sub-sub-agent（但生产级禁止超过 1 层嵌套）
    代表：DeepSeek Workflow → Jobs, Grok SchedulerHandle 树
    优点：可表达复杂任务分解
-   缺点：嵌套导致上下文爆炸与权限继承复杂，七家一致禁止嵌套 teammate
+   缺点：嵌套导致上下文爆炸与权限继承复杂，九家一致禁止嵌套 teammate
 ```
 
 **多 Agent 是否值得：2024–2025 实证的工程归纳**。严格说，目前不存在一个权威基准系统性地回答"什么任务该用什么拓扑"——SWE-bench 测的是单 Agent 修复能力，多 Agent 的证据来自三份互相补充的工作（9.1.2 已精读：More Agents 扩展律、Anthropic 生产实测、Cognition 反方论证）。把它们的结论按任务类型归纳，得到下表——注意这是**工程经验归纳而非单一基准结果**，引用时请注明来源：
@@ -181,7 +181,7 @@ Hierarchical (分层)
 | 跨 5+ 文件的探索/搜集 | 次优（串行慢） | **最优**（并行搜集） | 可选 | Orchestrator-Worker | Anthropic：研究类任务提速约 90%，代价 token ~15× |
 | 大规模独立子问题批量求解 | 受限于方差 | **最优**（多数投票/分头尝试） | 过度设计 | Orchestrator-Worker（退化形式） | More Agents Is All You Need：采样投票单调增益 |
 | 多角色协作（reviewer/tester/implementer） | 无法表达 | 可表达但主 Agent 瓶颈 | 理论最优、实践罕见 | Swarm（实验性） | 九家中无一生产化自由 Swarm（见 9.3） |
-| 需严格 SOP 的企业流程 | 无法保证 | 可通过 plan 文件约束 | 难约束 | Hierarchical（1 层） | MetaGPT artifact 化遗产；嵌套超一层七家一致禁止 |
+| 需严格 SOP 的企业流程 | 无法保证 | 可通过 plan 文件约束 | 难约束 | Hierarchical（1 层） | MetaGPT artifact 化遗产；嵌套超一层九家一致禁止 |
 
 ---
 
@@ -189,7 +189,7 @@ Hierarchical (分层)
 
 ### 9.2.1 Planner：显式状态容器的三种形态
 
-规划的本质是"**把未来要做的事从模型隐式记忆中抽出来，写到外部可观测、可修改、可持久化的状态容器中**"。七家给出三种容器，按"可审计性"递增：
+规划的本质是"**把未来要做的事从模型隐式记忆中抽出来，写到外部可观测、可修改、可持久化的状态容器中**"。九家给出三种容器，按"可审计性"递增：
 
 ```
 形态1：Message（隐式，最弱）
@@ -299,9 +299,11 @@ type TodoWriteInput = {
 // Claude 解法：TodoWrite 基于 content 的 upsert 语义 + Session.append 的追加式保证
 ```
 
+> 「只增不改」：TodoWrite 的按 content upsert 合并与 `Session.append` 的追加写同属这一模式——状态只追加、历史不覆盖，多 Agent 并发更新才互不丢。OpenCode 的 `Session.fork()` 以"复制后各自追加"实现同一保证（`packages/opencode/src/session/session.ts:693`），子 Session 从 fork 点起只增不改，与主 Session 互不覆写。
+
 ### 9.2.2 子 Agent 隔离模型：worktree vs Actor vs Scope
 
-隔离回答"**子 Agent 的副作用能否被关住、能否与主 Agent 并行而不互踩**"。七家给出三档隔离，按强度递增：
+隔离回答"**子 Agent 的副作用能否被关住、能否与主 Agent 并行而不互踩**"。隔离强度的本质是「故障边界」的半径——子 Agent 崩溃、写错文件、越权调用时，爆炸半径被关在哪一层：协程（无边界）、`Scope`（句柄级，`packages/core/agent-loop/src/agent.ts:70`）、worktree（文件级，`createAgentWorktree()`）。九家给出三档隔离，按强度递增：
 
 ```
 隔离强度递增 ──────────────────────────────────────────────►
@@ -357,7 +359,7 @@ Pi / OpenCode fork         DeepSeek Cordis Scope          Claude worktree/remote
    │ 若冲突 → 人类介入或自动取主    │                              │                          │
 ```
 
-> **为什么 worktree 必要**：若仅有 bwrap（进程级沙箱）而无 worktree（文件系统级），两个 subagent 并行 `write_file("src/a.ts")` 仍会写同一 inode，后写者覆盖前写者，丢失更新。Grok 的 `xai-fast-worktree` 与 Claude 的 `createAgentWorktree()` 正是为解决此问题——**bwrap 隔离单次执行，worktree 隔离整个会话的文件集，二者正交且互补**（见 Ch4.2.4）。
+> **为什么 worktree 必要**：若仅有 bwrap（进程级沙箱）而无 worktree（文件系统级），两个 subagent 并行 `write_file("src/a.ts")` 仍会写同一 inode，后写者覆盖前写者，丢失更新。Grok 的 `xai-fast-worktree` 与 Claude 的 `createAgentWorktree()` 正是为解决此问题——**bwrap 隔离单次执行，worktree 隔离整个会话的文件集，二者正交且互补**（见 [Ch4.2.4](./ch04-tools.md#_4-2-4-支柱四-沙箱隔离模型-sandbox-isolation)）。
 
 #### Scope 隔离的精髓（DeepSeek Cordis）
 
@@ -413,7 +415,7 @@ impl ChatStateActor {
 
 ### 9.2.3 通信机制：Inbox vs InterAgentCommunication vs EventV2Bridge
 
-通信回答"**子 Agent 的结果如何回到主 Agent，主 Agent 如何在中途 steer 子 Agent**"。七家给出三类机制：
+通信回答"**子 Agent 的结果如何回到主 Agent，主 Agent 如何在中途 steer 子 Agent**"。九家给出三类机制：
 
 #### 三类通信的对比
 
@@ -426,10 +428,12 @@ impl ChatStateActor {
 | Grok | `TurnInput contributors` + `SchedulerHandle` 树 | 中：`contributors` 列表 | 树状广播 | `xai-agent-lifecycle/local/{registry,contributors}` |
 | Pi | `hooks-and-events` + `resources` | 粗：回调式注入 | 单向：子→主 | `packages/agent/src/types.ts` |
 
-#### DeepSeek Inbox 的精确语义（七家最细）
+> 注：Claw 为占位、Qwen-Agent 为库形态对照组（见 [Ch1](./ch01-landscape.md)）、Hermes 的子代理由 `async_delegation` 并行（见 [Ch3](./ch03-loop.md) 对证表），三者未列入本表。
+
+#### DeepSeek Inbox 的精确语义（九家最细）
 
 ```ts
-// DeepSeek: packages/core/agent/src/inbox.ts (伪代码，见 Ch3.2.4.2)
+// DeepSeek: packages/core/agent/src/inbox.ts (伪代码，见 [Ch3.2.4.2](./ch03-loop.md#_3-2-4-2-inbox-inputqueue-的精确语义-deepseek-最精确))
 type Target = 'next-turn' | 'next-step';
 class Inbox {
   private queue: Message[] = [];
@@ -492,11 +496,11 @@ pub struct InterAgentCommunication {
 // 缺点：无精确的 next-step/next-turn 语义，时序靠事件顺序隐式保证
 ```
 
-> **通信的时序保证**：DeepSeek 的 `Inbox.splice(next-step)` 是唯一能在"采样中"插入消息的机制（对应 Ch3 的 `wakingAfterAbort` 闩锁）。Codex 的 `InputQueue` 每 turn 起点排空，turn 内不抢占，时序保证较弱但实现简单。OpenCode 的 `EventV2Bridge` 最简，适合单机多 Agent，跨机需额外一致性协议。
+> **通信的时序保证**：DeepSeek 的 `Inbox.splice(next-step)` 是唯一能在"采样中"插入消息的机制（对应 [Ch3](./ch03-loop.md) 的 `wakingAfterAbort` 闩锁）。Codex 的 `InputQueue` 每 turn 起点排空，turn 内不抢占，时序保证较弱但实现简单。OpenCode 的 `EventV2Bridge` 最简，适合单机多 Agent，跨机需额外一致性协议。
 
 ### 9.2.4 钩子：waterfall vs before/after
 
-钩子回答"**协作的生命周期事件由谁、以何种顺序拦截**"。七家分两派：
+钩子回答"**协作的生命周期事件由谁、以何种顺序拦截**"。九家分两派：
 
 #### 两派钩子的对比
 
@@ -582,6 +586,8 @@ type AgentLoopConfig = {
 | **OpenCode** | `packages/opencode/src/agent/agent.ts:35 Info{mode:subagent\|primary\|all}` + `tool/task.ts` | `Session.fork()` + `subagent-permissions.ts` 权限继承 | `skill` 发现 | `EventV2Bridge` | `tool/task.ts` + `task.txt` + `todo` + `plan_enter/plan_exit` 受限工具 | `EventV2Bridge` + `Agent.steps` | `Info.mode` 控制，1 层 |
 | **Pi** | `docs/book/23-subagents.md AgentTool{subagent_type}` 触发子 `agentLoop()` | 同进程协程，无文件隔离 | `coding-agent` 主 + `explore` 只读子 | `hooks-and-events` + `resources` | 无显式规划容器（消息隐式） | `beforeToolCall/afterToolCall/prepareNextTurn/shouldStopAfterTurn` | 同进程，无嵌套 |
 | **Claw** | 占位（规划中） | — | — | — | `compact_after_turns=12` 粗糙阈值 | — | — |
+
+> 注：本表未列入 Qwen-Agent 与 Hermes——Qwen-Agent 为库形态对照组（定位见 [Ch1](./ch01-landscape.md)，对照专节在 Ch7/Ch10/Ch11），Hermes 的多 Agent 形态（MoA / `async_delegation` 并行）在 [Ch3](./ch03-loop.md) 对证表处理。
 
 > 一句话区分：**Claude 求全（60+ 类型 + worktree/remote 双隔离）、Codex 求系统（模板 + InputQueue）、Grok 求隔离（btrfs + Actor）、DeepSeek 求插件（Scope + 四级规划）、OpenCode 求现代（Effect + task 文件）、Pi 求可读（同进程协程）、Claw 占位**。
 
@@ -788,6 +794,8 @@ impl ChatStateActor {
 }
 ```
 
+> 「投影而非改写」：`capture_from(turn_start_offset)` 给子 Agent 的是主 Agent 状态的只读投影——子 Agent 在投影上工作，真源 `ChatState` 仍只由单 task 持有、不被改写（`xai-chat-state/src/actor/mod.rs`）。同策：OpenCode `Session.fork()` 的 `structuredClone`（`packages/opencode/src/session/session.ts:693`）、Claude `effectiveType=fork` 的 cache-identical 前缀，都是"投影一份给子 Agent，真源不动"。
+
 **精读点**：
 
 - **`SubagentEntry{source}` 的可扩展性**：与 Claude 的 60+ 硬编码类型不同，Grok 的 `SubagentEntry` 支持 `Builtin/Plugin/Remote` 三来源，`list_skills_with_plugins` 动态发现，与 DeepSeek 的 `preset.yml` 同策不同实现。
@@ -841,10 +849,10 @@ class SubagentControl {
 
 **精读点**：
 
-- **四级规划栈是"最细的规划分解"**：`Goal → Plan → Todo → Workflow → Jobs` 每级均有独立 package，可独立测试与复用。`Goal` 是用户意图，`Plan` 是可 review 的 artifact，`Todo` 是执行清单，`Workflow` 是带依赖的执行图，`Jobs` 是后台任务。七家中仅 DeepSeek 做到此粒度。
+- **四级规划栈是"最细的规划分解"**：`Goal → Plan → Todo → Workflow → Jobs` 每级均有独立 package，可独立测试与复用。`Goal` 是用户意图，`Plan` 是可 review 的 artifact，`Todo` 是执行清单，`Workflow` 是带依赖的执行图，`Jobs` 是后台任务。九家中仅 DeepSeek 做到此粒度。
 - **`Cordis Scope` 的 RAII 语义**：`Scope.createScope(loopCtx, this)` 的第二个参数 `this` 是"所有者"，Scope 随所有者退出自动 dispose，无泄漏。这是 DeepSeek 60+ 插件能安全高频派发 subagent 的基础。
 - **`preset.yml` 的组合机制**：`preset.yml` 决定子 agent 的工具组合（`code/standard/minimal/cordis` 四档），与 Grok 的 `SubagentEntry{source}` 同策，但 DeepSeek 更声明式。
-- **`Inbox.nextStep` 判空 → break**：`waterfall('agent/turn-stopping')` 中 `Inbox.nextStep` 为空即结束 turn，`turnEnds=max-tokens` 的黏性保证用量归因不被 `completed` 覆盖（见 Ch2 的适配器剥除）。
+- **`Inbox.nextStep` 判空 → break**：`waterfall('agent/turn-stopping')` 中 `Inbox.nextStep` 为空即结束 turn，`turnEnds=max-tokens` 的黏性保证用量归因不被 `completed` 覆盖（适配器剥除见 [Ch8.2.3](./ch07-model.md#_8-2-3-preparedllmcall-与适配器剥除)）。
 
 #### OpenCode — `packages/opencode/src/agent/agent.ts:35 Info{mode}` + `tool/task.ts` + `Session.fork()`
 
@@ -947,7 +955,7 @@ export const agentTool = buildTool({
 **精读点**：
 
 - **教学价值**：Pi 的同进程协程是"200 行可运行的多 Agent 实验室"——无 worktree、无 Actor、无 Scope，所有隔离靠"工具白名单"保证。读者可在 50 行内改出"worktree 隔离"版本以体会差异。
-- **局限**：无文件隔离，并行 `write_file` 必冲突；无 `Inbox` 精确语义，通信靠 `hooks-and-events` 回调；无 plan artifact，规划隐式在消息中。这正是 Pi 作为教学实现的刻意简化——**先让多 Agent 跑起来，再逐步加隔离**。
+- **局限**：无文件隔离，并行 `write_file` 必冲突；无 `Inbox` 精确语义，通信靠 `hooks-and-events` 回调；无 plan artifact，规划隐式在消息中。这正是 Pi 作为教学实现的刻意简化——**先让多 Agent 跑起来，再逐步加隔离**，只付「最小 Harness 税」：全部隔离机制缺席，仅余 `agentLoop()` 协程 + 工具白名单（`packages/agent/src/types.ts`），换来 200 行可读的完整多 Agent 闭环。
 - **迁移路径**：Pi → OpenCode（加 `Session.fork()`）→ DeepSeek（加 `Scope`）→ Claude/Grok（加 `worktree`），是"隔离强度"的渐进路径。
 
 #### Claw — 占位（规划中）
@@ -961,7 +969,7 @@ export const agentTool = buildTool({
 
 > **Claw 的反例价值**：`compact_after_turns=12` 的固定轮数触发 vs Claude `effectiveWindow-13K` / Grok `85%` 的 token 预算驱动，是"原型 vs 生产"的典型差距——固定轮数在长工具结果场景 12 轮前已 PTL，在短轮场景又过早压缩。
 
-### 9.3.3 七家对证小结：一张"隔离与规划"的有无表
+### 9.3.3 九家对证小结：一张"隔离与规划"的有无表
 
 | 能力 | Claude | Codex | Pi | DeepSeek | Grok | OpenCode | Claw |
 |------|--------|-------|----|----------|------|----------|------|
@@ -974,7 +982,9 @@ export const agentTool = buildTool({
 | **精确通信** | ✅ InterAgent | ✅ InputQueue | △ 回调 | ✅ Inbox | ✅ contributors | △ EventV2 | ❌ |
 | **钩子** | ✅ Pre/PostCompact | ✅ ExtensionData | △ before/after | ✅ waterfall | ✅ ReminderPolicy | △ Event | ❌ |
 
-> 结论：七家差异不在"有无多 Agent"，而在"隔离强度 × 规划显式度 × 通信精度"。Pi 只有"有"，Claude/Grok/DeepSeek 有"强"。
+> 注：本表未列入 Qwen-Agent 与 Hermes——前者为库形态对照组、后者子代理形态见 [Ch3](./ch03-loop.md)，同 9.3.1 注。
+
+> 结论：九家差异不在"有无多 Agent"，而在"隔离强度 × 规划显式度 × 通信精度"。Pi 只有"有"，Claude/Grok/DeepSeek 有"强"。
 
 ---
 
@@ -1064,7 +1074,7 @@ export const agentTool = buildTool({
 |------|----------------|------|------|
 | Worker 只读探索（read/grep/glob） | ❌ 无需 | 无副作用，并行安全 | Claude explore, Pi explore |
 | Worker 并行写不同文件 | ⚠️ 建议 | 虽不同文件但共享 worktree 时仍有 git 状态竞争 | Grok btrfs |
-| Worker 并行写同一文件 | ✅ **必须** | 后写者覆盖前写者，丢失更新（见 Ch4.4.4 失败案例） | Claude worktree, Grok fast-worktree |
+| Worker 并行写同一文件 | ✅ **必须** | 后写者覆盖前写者，丢失更新（见 [Ch4.4.4](./ch04-tools.md#_4-4-4-失败案例汇总) 失败案例） | Claude worktree, Grok fast-worktree |
 | 单 Agent 串行写 | ❌ 无需 | 串行无竞争 | 全部 |
 | Hierarchical 多级写 | ✅ **必须** | 每级写操作需隔离，完成后 merge | DeepSeek Scope + worktree 双层 |
 
@@ -1125,7 +1135,7 @@ DeepSeek: dsh-plan-mode 产出的 plan artifact
 ### 9.4.6 规划状态机 vs 工具编排的正交性
 
 ```
-规划状态机（本章 9.2.1）          工具编排（Ch4.2.5）
+规划状态机（本章 9.2.1）          工具编排（[Ch4.2.5](./ch04-tools.md#_4-2-5-支柱五-并行正确性-isconcurrencysafe)）
      │                                │
      ├─ 决定"做什么"（任务分解）        ├─ 决定"怎么做"（工具调用顺序）
      ├─ 容器：TodoWrite/task/plan 文件 ├─ 容器：ToolOrchestrator + ToolRouter
@@ -1175,7 +1185,7 @@ DeepSeek: dsh-plan-mode 产出的 plan artifact
 4. worktree 池化：预创建 btrfs 快照池，派发时 <10ms（vs 现场创建 50-100ms）
 ```
 
-**七家现状与差距**：
+**九家现状与差距**：
 
 | 家 | 调度能力 | 差距 |
 |----|----------|------|
@@ -1183,6 +1193,8 @@ DeepSeek: dsh-plan-mode 产出的 plan artifact
 | DeepSeek | `Cordis Scope` 树 + `dsh-jobs-local` 后台任务 | 最接近 OS，但无抢占 |
 | Grok | `SchedulerHandle` 树 + `xai-fast-worktree` | 有 worktree 但无统一调度器 |
 | Codex | `collaboration-mode-templates` 静态模板 | 无动态调度 |
+
+> 注：本表仅列有调度雏形锚点的四家；OpenCode / Pi / Qwen-Agent / Claw / Hermes 在 Agent OS 调度维度无专节处理，未列入。
 
 > **可验证假设**：Agent OS 调度器的首个可观测指标是"worktree 池命中率"——池化后 subagent 启动延迟应从 50-100ms 降至 <10ms，且 P99 稳定。
 
@@ -1212,9 +1224,9 @@ Grok 的 SkillInfo + DeepSeek 的 dsh-skill + OpenCode 的 skill/ 已迈出第�
 
 **关键设计**：
 
-- **发现**：`Grok discovery.rs SubagentEntry{source}` + `DeepSeek preset.yml` + `OpenCode skill/` 三者的泛化——统一为 `Skill Registry` 的语义检索（Gorilla 思想的延续，见 Ch4.1.1）
+- **发现**：`Grok discovery.rs SubagentEntry{source}` + `DeepSeek preset.yml` + `OpenCode skill/` 三者的泛化——统一为 `Skill Registry` 的语义检索（Gorilla 思想的延续，见 [Ch4.1.1](./ch04-tools.md#_4-1-1-时间线总览)）
 - **计费**：按 `token 用量 × skill 复杂度` 计费，`UsageLedger`（Grok）已具备用量归因基础
-- **信任**：`skill` 的 `prompt_template` 需沙箱审计，防止 prompt 注入提权（见 Ch11 安全）
+- **信任**：`skill` 的 `prompt_template` 需沙箱审计，防止 prompt 注入提权（见 [Ch11](./ch10-reliability.md) 安全）
 
 ### 9.5.3 Workflow DSL：从 TodoWrite 到可编排图
 
@@ -1235,7 +1247,7 @@ LangGraph 的 StateGraph 是雏形，DeepSeek 的 dsh-workflow/worker-thread 是
 下一跳：Workflow DSL 的类型化 + 静态检查（类似 GitHub Actions 的 workflow.yml）
 ```
 
-**七家现状**：
+**九家现状**：
 
 | 家 | Workflow 能力 | DSL 形态 |
 |----|--------------|----------|
@@ -1244,6 +1256,8 @@ LangGraph 的 StateGraph 是雏形，DeepSeek 的 dsh-workflow/worker-thread 是
 | LangGraph | `StateGraph{ nodes, edges, checkpoint }` | TS/Python 代码即 DSL |
 | Claude | `TodoWrite` 线性，无 DAG | 无 |
 | 未来 | Workflow DSL 文件（`.agent/workflows/*.yaml`） | 声明式，支持 `parallel/sequential/conditional` |
+
+> 注：本表含框架对照（LangGraph 非九家）；Codex / OpenCode / Pi / Qwen-Agent / Claw / Hermes 在 Workflow DSL 维度无专节处理，未列入。
 
 > **可验证假设**：Workflow DSL 的首个可观测收益是"并行度提升"——DAG 中无依赖的节点可并行执行，相比 TodoWrite 的串行，端到端延迟降低与 DAG 宽度成正比。
 
@@ -1269,7 +1283,7 @@ Agent-C worktree-C  ─┘ 无共享            │  ┌────────
                                        │  └──────────────────┘           │
                                        └──────────────────────────────────┘
 
-今日七家均为"强隔离"，跨 Agent 共享靠"主 Agent 汇总"间接实现
+今日九家均为"强隔离"，跨 Agent 共享靠"主 Agent 汇总"间接实现
 未来：受控的共享 Memory 层，类似多进程的共享内存 + 信号量
 ```
 
@@ -1281,7 +1295,7 @@ Agent-C worktree-C  ─┘ 无共享            │  ┌────────
 
 **与本书其他章的衔接**：
 
-- Ch6 Memory 的 `MemGPT / A-MEM / FadeMem` 均假设单 Agent，跨 Agent 共享需新增"多租户 Memory"抽象
+- [Ch6](./ch05b-memory.md) Memory 的 `MemGPT / A-MEM / FadeMem` 均假设单 Agent，跨 Agent 共享需新增"多租户 Memory"抽象
 - Grok 的 `ChatStateActor` 单 task 拥有状态是"强隔离"的极致，未来需在 Actor 间加"受控共享"通道
 
 ### 9.5.5 评估与信用分配：谁的功劳
@@ -1443,8 +1457,6 @@ npm run dev -- --print "并行探索 src/ 下的 auth 和 payment 模块，然�
 # 检查：trace 中应有 2 个 agent 调用，且子 Agent 仅调只读工具
 ```
 
-**思考题**：若让 explore 子 Agent 并行 `write_file` 会怎样？（答：丢失更新，需 Lab 4 的 worktree 隔离）
-
 ### Lab 4 — worktree 隔离 + 禁止嵌套（60 分钟，可选进阶）
 
 **目标**：为写操作的 subagent 添加 worktree 隔离，并禁止嵌套。
@@ -1476,6 +1488,16 @@ npm run dev -- --print "让 subagent 再派生 subagent"
 
 ---
 
+## 思考题（★ 为进阶）
+
+1. **追加语义**：若 TodoWrite 改成覆盖式写（每次全量替换清单），两个 subagent 同时完成时会在哪个时序点丢更新？为什么「只增不改」的按 content upsert 能根治？（提示：对照 9.2.1 的失败案例与 `Session.append` 的追加保证。）
+2. **隔离选型**（原 Lab 3 思考题）：若让 explore 子 Agent 并行 `write_file` 会怎样？（答：丢失更新，需 Lab 4 的 worktree 隔离——正是 9.4.4 的失败案例。）
+3. ★ **故障边界的半径**：DeepSeek 的 `Scope.dispose()` 能收回工具句柄，但收不回子 Agent 已写出的文件。若要求"子 Agent 崩溃后文件系统零残留"，最小改动是什么？（提示：worktree + merge 前丢弃，对照 9.2.2 的隔离三档。）
+4. ★ **通信精度**：Codex 的 `InputQueue` 每 turn 起点排空，DeepSeek 的 `Inbox.splice(next-step)` 可采样中插入。把后者移植到 Codex，需要改动 `run_turn` 的哪几个检查点？（提示：对照 [Ch3.2.4.2](./ch03-loop.md#_3-2-4-2-inbox-inputqueue-的精确语义-deepseek-最精确) 的取消语义。）
+5. ★ **信用分配**：9.5.5 的 Shapley Value 需要"每个子任务的独立 pass/fail"。在 [Ch10](./ch09-observability.md) 的 Trace 最小完备集上，还需补哪个字段才能离线计算每个 Worker 的 Shapley 值？
+
+---
+
 ## 9.7 小结：何时用多 Agent（30 秒陈述）
 
 > **单 Agent 足够**：≤10 步、单文件、单工具链（如修一个函数 bug），多 Agent 反而增加数倍 token 成本（Cognition 原则①）。
@@ -1486,9 +1508,11 @@ npm run dev -- --print "让 subagent 再派生 subagent"
 >
 > **三条铁律**：禁止嵌套 teammate（防递归风暴）、plan 必须落盘为文件（可审计）、子 Agent 权限单调不增（不可提权）。
 >
-> **一句话区分七家**：Claude 最全（60+ 类型 + worktree/remote）、Grok 最隔离（btrfs + Actor）、DeepSeek 最插件（Scope + 四级规划）、Codex 最系统（模板 + InputQueue）、OpenCode 最现代（Effect + task 文件）、Pi 最可读（同进程协程）、Claw 占位。
+> **一句话区分九家**：Claude 最全（60+ 类型 + worktree/remote）、Grok 最隔离（btrfs + Actor）、DeepSeek 最插件（Scope + 四级规划）、Codex 最系统（模板 + InputQueue）、OpenCode 最现代（Effect + task 文件）、Pi 最可读（同进程协程）、Claw 占位、Qwen-Agent 对照（库形态）、Hermes（MoA / `async_delegation` 并行，见 [Ch3](./ch03-loop.md)）。
+>
+> **回扣公式**：多 Agent 并未改写 `Agent = Model + Harness`——它只是把 Harness 的六件套复制成 N 份，再用「故障边界」（隔离）、显式 plan 容器（规划）与精确通信把 N 份粘成一个可审计的系统；「只增不改」与「投影而非改写」保证 N 份并发不互相污染。
 
-**下一章**：可观测性与评测（Ch10）——多 Agent 的轨迹如何被 Trace 记录、如何用 SWE-bench / BFCL 评估协作效果、以及 Agent OS 调度器的可观测指标。
+**下一章**：可观测性与评测（[Ch10](./ch09-observability.md)）——多 Agent 的轨迹如何被 Trace 记录、如何用 SWE-bench / BFCL 评估协作效果、以及 Agent OS 调度器的可观测指标。
 
 ---
 

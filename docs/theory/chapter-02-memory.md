@@ -1,5 +1,7 @@
 # 第二章：Agent Memory 架构深度分析
 
+> **源码卷对位阅读**：本章（T2）对应源码卷 [第 6 章 Memory 深潜：从 MemGPT 到 A-MEM](../ch05b-memory.md)——本章讲"为什么"（不可能三角、五问表），源码卷讲九家的"估算→预算→压缩→投影"怎么落地。
+
 ## Memory 为什么是 Agent 的核心瓶颈
 
 ### 问题的本质
@@ -642,3 +644,5 @@ Agent Memory 不是 RAG 的简单扩展，它是一个新的系统工程领域�
 4. **遗忘机制**：如何选择性地遗忘以保持 memory 的可扩展性和质量
 
 **一到两年内会被广泛接受但今天还未被充分理解的观点**：Agent Memory 最终会收敛到类似数据库的 ACID 保证级别——可审计、可回滚、一致性可配置。
+
+> **回到源码卷**：[第 6 章 Memory 深潜：从 MemGPT 到 A-MEM](../ch05b-memory.md) 给出九家 Memory 落地与最小 Zettelkasten Lab。

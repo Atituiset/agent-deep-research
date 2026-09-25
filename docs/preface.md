@@ -12,7 +12,7 @@
 - 每个 Lab 都有骨架、验收标准与常见坑，`git diff` 可检验
 - 把 Qwen-Agent 作为"库形态对照组"，划清框架与产品的职责边界
 
-## 研究对象：七码一书
+## 研究对象：九家一书
 
 | 代号 | 仓库 | 语言/形态 | 定位 |
 |------|------|-----------|------|
@@ -25,7 +25,7 @@
 | **Grok Build** | `grok-build` (`crates/codegen/xai-chat-state/src/actor/state.rs`) | Rust Actor | xAI 实现，可靠性标杆 |
 | **Qwen-Agent** | `Qwen-Agent` (`qwen_agent/agent.py:31`) | Python 纯框架库 | 阿里通义；**库形态对照组** |
 | **Hermes Agent** | `hermes-agent` (`agent/conversation_loop.py:1766`) | Python 单体+网关 | Nous Research；自改进学习闭环 |
-| **Infra 研究** | 已并入本书**卷 VI**（`src/theory/`，T1–T7 + 附录 TA–TE） | 理论底座（论文综述) |
+| **Infra 研究** | 已并入本书**卷 VI**（`docs/theory/`，T1–T7 + 附录 TA–TE） | 理论底座（论文综述) |
 
 > 所有锚点真实可跳转，详见 [附录 B](./appendix-sources.md)。
 

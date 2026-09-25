@@ -1,11 +1,13 @@
 # 第13章 一页纸速查
 
 > 全书压缩成一张纸 + 5 分钟陈述框架 + 高频追问表。需要快速回顾时只看本章；平时当书签用。
+>
+> 统摄公式仍是 **Agent = Model + Harness**——这张纸压缩的是 Harness 侧六件套（[Ch2](./ch02-common-model.md)）在九家实现里的全部对照结论。
 
 ## 13.1 一页纸（可直接打印）
 
 ```
-Agent Infra 一页纸（八家源码对照版，2026-08）
+Agent Infra 一页纸（九家源码对照版，2026-08）
 
 【定位】Agent Infra = LLM 之上的操作系统：Prompt+Loop+Tools+Context+Session+Model 六件套
 【历史】ReAct(2022)→Reflexion/Voyager(2023)→SWE-agent/CodeAct(2024)；Toolformer→FC(2023-06)→MCP(2024-11)；
@@ -43,7 +45,7 @@ Agent Infra 一页纸（八家源码对照版，2026-08）
 【评测两层】结果指标(SWE-bench pass@k)定门槛 + 过程指标(trace 步骤分析/PRM)定位瓶颈
 ```
 
-## 13.2 八家一句话（被问"你研究过哪些"时用）
+## 13.2 九家一句话（被问"你研究过哪些"时用）
 
 | 家 | 关键词 |
 |----|--------|
@@ -59,7 +61,7 @@ Agent Infra 一页纸（八家源码对照版，2026-08）
 
 ## 13.3 五分钟陈述框架（总→分→证→选）
 
-**① 总**："Agent Infra 是 LLM 之上的操作系统，我精读了九家实现——五家产品级 Harness（Claude/Codex/Grok/DeepSeek/OpenCode）、两家教学与框架形态（Pi/Qwen-Agent）、一家移植对照（Claw）。剥开都是六件套：Prompt+Loop+Tools+Context+Session+Model，每件都有清晰的论文源头到工程纵深的演化线。"
+**① 总**："Agent Infra 是 LLM 之上的操作系统，我精读了九家实现——五家产品级 Harness（Claude/Codex/Grok/DeepSeek/OpenCode）、两家教学与框架形态（Pi/Qwen-Agent）、一家移植对照（Claw）、一家自进化路线代表（Hermes）。剥开都是六件套：Prompt+Loop+Tools+Context+Session+Model，每件都有清晰的论文源头到工程纵深的演化线。"
 
 **② 分**："分水岭在四处。Loop 上 while 易读但打断难，生产选 FSM 或 Actor；Tools 上可见性分级比数量重要，权限必须横切；Context 上 chars/4 估算是共识（Qwen-Agent 用真 tiktoken 是唯一例外）、压缩必分层；Session 上可重放优于可恢复，turn/start 边界必须有锚点。"
 
@@ -75,8 +77,8 @@ Agent Infra 一页纸（八家源码对照版，2026-08）
 | 缓存命中率怎么保？ | 工具 localeCompare 排序 + prompt 冻结 + contentHash 替代随机 UUID；关前缀缓存实测 98% miss | `claude-code-haha/src/services/api/claude.ts:361` |
 | 工具何时能并行？ | isReadOnly && isConcurrencySafe 才并行，preflight 仍串行；Pi 要求 terminate 全员置位 | `claude-code-haha/src/Tool.ts:362` |
 | resume 怎么保证可信？ | 先写 user 再调模型 + 边界锚点（预写/version/offset）+ 启动自愈 | `QueryEngine.ts:451` / `history.rs:93` / Grok journal |
-| 多 Agent 何时上？ | 分界条件：≤10 步单 Agent；并行搜集→Orchestrator-Worker（Anthropic 实测提速约90%、token ~15×）；强耦合编辑单线程；多角色→Swarm 但必须 worktree + 禁嵌套 | `AgentTool/builtInAgents.ts` / Ch9 §9.1.2 |
-| 提示注入怎么防？ | 承认概率问题：权限按调用链评估、结果截断溯源、审批分级记忆、最坏后果≤单次授权边界 | Ch11 威胁模型四象限 |
+| 多 Agent 何时上？ | 分界条件：≤10 步单 Agent；并行搜集→Orchestrator-Worker（Anthropic 实测提速约90%、token ~15×）；强耦合编辑单线程；多角色→Swarm 但必须 worktree + 禁嵌套 | `AgentTool/builtInAgents.ts` / [Ch9 §9.1.2](./ch08-multi-agent.md#_9-1-2-逐篇精读-多-agent-的五次形态变化与一次实证清算) |
+| 提示注入怎么防？ | 承认概率问题：权限按调用链评估、结果截断溯源、审批分级记忆、最坏后果≤单次授权边界 | [Ch11 威胁模型四象限](./ch10-reliability.md#_11-2-1-威胁模型四象限) |
 | 怎么评测你的 Agent？ | 结果（SWE-bench 式判分进 CI）+ 过程（trace 步骤分析）双层；LLM-as-Judge 控三类偏置 | `codex-rs/e2e/benchmark` |
 
 ## 13.5 便携卡片

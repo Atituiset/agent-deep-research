@@ -13,14 +13,14 @@
 
 | 仓库 | 路径 | 规模信号 | 启动入口 |
 |------|------|---------|---------|
-| claude-code-haha | `/home/atituiset/Projects/claude-code-haha` | `999.0.0-local`, `src/query.ts` 1729 行 | `bin/claude-haha → src/main.tsx:585 main()` |
-| claw-code-main | `/home/atituiset/Projects/claw-code-main` | Python 快照 + `rust/crates/*` 9 crates | `src/main.py:213` + `rust/crates/claw-cli/src/main.rs` |
-| codex | `/home/atituiset/Projects/codex` | `codex-rs/` 30+ crate + `book/docs/` 走读文档 | `codex-rs/cli/src/main.rs:115 MultitoolCli` |
-| opencode | `/home/atituiset/Projects/opencode` | `packages/*` 24+ 包, `Effect 4.0-beta.83` | `packages/opencode/src/index.ts` |
-| pi | `/home/atituiset/Projects/pi` | `packages/{agent,ai,coding-agent,server,storage,tui}/` 5 包 | `packages/agent/src/agent-loop.ts:155 runLoop` |
-| deepseek-harness | `/home/atituiset/Projects/deepseek-harness` | `packages/*` 60+ 包, `Cordis` | `apps/cli/src/bin.ts` + `preset.yml` |
-| grok-build | `/home/atituiset/Projects/grok-build` | `crates/codegen/*` 50+ crate | `xai-grok-agent::AgentBuilder` |
-| agent-infra | `/home/atituiset/Projects/agent-infra/agent-infra-research/src/` | mdBook 7 章 + 5 附录, 4126 行 | `book.toml`（**2026-08 已全量并入本书卷 VI `src/theory/`，原仓库可归档**） |
+| claude-code-haha | `../claude-code-haha`（与本书仓库同级） | `999.0.0-local`, `src/query.ts` 1729 行 | `bin/claude-haha → src/main.tsx:585 main()` |
+| claw-code-main | `../claw-code-main`（同级） | Python 快照 + `rust/crates/*` 9 crates | `src/main.py:213` + `rust/crates/claw-cli/src/main.rs` |
+| codex | `../codex`（同级） | `codex-rs/` 30+ crate + `book/docs/` 走读文档 | `codex-rs/cli/src/main.rs:115 MultitoolCli` |
+| opencode | `../opencode`（同级） | `packages/*` 24+ 包, `Effect 4.0-beta.83` | `packages/opencode/src/index.ts` |
+| pi | `../pi`（同级） | `packages/{agent,ai,coding-agent,server,storage,tui}/` 5 包 | `packages/agent/src/agent-loop.ts:155 runLoop` |
+| deepseek-harness | `../deepseek-harness`（同级） | `packages/*` 60+ 包, `Cordis` | `apps/cli/src/bin.ts` + `preset.yml` |
+| grok-build | `../grok-build`（同级） | `crates/codegen/*` 50+ crate | `xai-grok-agent::AgentBuilder` |
+| agent-infra | `../agent-infra/agent-infra-research/src/`（同级） | mdBook 7 章 + 5 附录, 4126 行 | `book.toml`（**2026-08 已全量并入本书卷 VI `docs/theory/`，原仓库可归档**） |
 
 ## D.3 高频引用文件清单（便于增量 diff）
 
@@ -132,7 +132,7 @@ agent-deep-research/
 ### 机制声明修正
 
 1. **Codex 工具可见性**：初稿写 `ToolExposure{Direct/Deferred/CodeModeOnly/Hidden}`；实证为 bitflags `ToolExposures{NONE/DIRECT/DEFERRED/CODE_MODE/ALL}`（tool_executor.rs:17-30），"Hidden"变体不存在——不可见即 `NONE`。
-2. **Claude 四层压缩顺序**：实证顺序 snip(query.ts:396)→micro(412)→collapse(440)→autocompact；且 collapse 受 `CONTEXT_COLLAPSE` feature flag 门控默认关闭、snip 与 micro 可同轮先后执行（396 行注释）。已写入 ch05.9 审计注记。
+2. **Claude 四层压缩顺序**：实证顺序 snip(query.ts:396)→micro(412)→collapse(440)→autocompact；且 collapse 受 `CONTEXT_COLLAPSE` feature flag 门控默认关闭、snip 与 micro 可同轮先后执行（396 行注释）。已写入 [ch05.7 审计注记](./ch05-context.md#_5-7-技术审计实证注记-2026-08-23-校准)。
 
 ### 论文/标准事实修正
 

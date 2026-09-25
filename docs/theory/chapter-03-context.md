@@ -1,5 +1,7 @@
 # 第三章：Context Engineering
 
+> **源码卷对位阅读**：本章（T3）对应源码卷 [第 5 章 Context 工程](../ch05-context.md)——本章讲 Token 经济学与摘要五类型，源码卷讲四层防线与 Prompt Caching 断点稳定。
+
 ## 定义与边界
 
 **Context Engineering** 是对 LLM context window 内容的系统性设计和优化。它不是 Prompt Engineering——后者关注"写什么"，前者关注"在有限空间内放什么、怎么放、放多少、以及什么时候换掉"。
@@ -478,3 +480,5 @@ class ContextAllocator:
 随着 Agent 从 demo 走向生产，Context Window 的精细管理会越来越重要。就像数据库需要 Buffer Pool Manager、操作系统需要 Memory Manager——Agent Runtime 需要 **Context Manager** 作为一等公民。
 
 这不是一个"加个摘要就够了"的问题，而是一个需要系统性设计的子系统。
+
+> **回到源码卷**：[第 5 章 Context 工程](../ch05-context.md) 给出九家的四层防线与压缩/缓存实现对证。

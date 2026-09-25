@@ -1,11 +1,13 @@
 # 第6章 Memory 深潜：从 MemGPT 到 A-MEM
 
+> 回到统摄公式 **`Agent = Model + Harness`**（[Ch1](./ch01-landscape.md)）：在 [Ch2](./ch02-common-model.md) 的六件套中，Memory 不单列为顶层件，而是 **Context 的长期延伸与 Session 的索引层**——[Ch5](./ch05-context.md) 解决“这一轮别爆窗”，本章解决“下一轮还记得、跨会话仍连贯”。
+>
 > Context 是“工作记忆”，Memory 是“长期记忆”。如果 Context 解决“这一轮别爆窗”，Memory 就解决“下一轮还记得、跨会话仍连贯、越用越懂你”。本章把九家实现放回到 2017—2026 的论文与系统 lineage 中，拆开“五维分类 × 四范式 × Memory Pipeline 五步”，并给出最小 Zettelkasten 的可运行 Lab。
 
 ## 本章图谱
 
 ```
-论文 lineage ──► 原理抽象 ──► 七家对证 ──► 权衡取舍 ──► 未来演进
+论文 lineage ──► 原理抽象 ──► 九家对证 ──► 权衡取舍 ──► 未来演进
  MemGPT          五维分类      Grok/DeepSeek  Pipeline 五步  Federated
  Voyager         四范式        OpenCode/Claude OS分页 vs  多模态
  GenAgents       写入/检索     Pi/Codex/Claw  Zettelkasten vs Safety
@@ -50,7 +52,7 @@ timeline
 | **2025.10** | **A-MEM** — Xu et al., **NeurIPS 2025** (arXiv 2502.12110) | **Zettelkasten 笔记盒** + **Note / Link / Evolution / Retrieval 四阶段** + **写入时（Write-time）代理权** | Memory 的“代理权前移”里程碑 | **本章核心对证**：与 RAG 的检索时代理形成镜像对比（见 6.2.3） |
 | **2026.02** | **FadeMem** — (生物启发衰减, 2026) | 艾宾浩斯遗忘曲线 + 强化回放 + 重要性门控的动态衰减，支持“自然遗忘” | Memory 的“遗忘”有了可微公式 | Grok `memory_flush` 与 DeepSeek `compaction-tool-result-pruner` 的遗忘策略的理论底座 |
 | **2026.03** | **Memory in the LLM Era** — 综述 (2026) | 系统化五维分类（时间×类型×组织×代理权×演化）与四范式框架 | 本章 6.2 的分类学直接来源 | 全书 Memory 术语的收敛锚点 |
-| **2026.04** | **memorywire** — 标准 (2026) | 定义 Memory 的互操作线缆：`MemoryBlock / MemoryStream / MemoryProvider` 接口，跨 Agent 携带 | Memory 的“MCP 时刻” | 预判七家将从私有 Session 格式向标准 Provider 收敛（见 6.5） |
+| **2026.04** | **memorywire** — 标准 (2026) | 定义 Memory 的互操作线缆：`MemoryBlock / MemoryStream / MemoryProvider` 接口，跨 Agent 携带 | Memory 的“MCP 时刻” | 预判九家将从私有 Session 格式向标准 Provider 收敛（见 6.5） |
 | **2023-2026** | **Zep / Cognee** — 图记忆 lineage | Zep：时序知识图谱（Temporal KG）+ 事实抽取；Cognee：代码/文档的图谱化 Memory | 图存储的 Memory 分支 | [理论卷 T2](./theory/chapter-02-memory.md) 视为向量/图双轨的收敛点 |
 
 > 年份标注原则：以 arXiv 首发或会议录用年为准；Letta 与 MemGPT 为同一团队的“论文→产品”分叉，故并列 2024.10。
@@ -81,8 +83,8 @@ timeline
 
 **可抄的工程点**（[理论卷 T2](./theory/chapter-02-memory.md) 亦强调）：
 - **中断式换页**：不是外部定时器触发，而是 LLM 通过 `function_call` 自主发起 `memory_search / memory_append`，对应 Claude `compactConversation()` 前的 `PreCompact hooks` 与 Grok `CompactionPolicy{wall_clock_budget_secs:300}` 的“模型自感知阈值”。
-- **分层驱逐**：FIFO 队列的头/尾/锚点保留（Claude `compact_boundary.preservedSegment{head/tail/anchor}`）即 OS 的“常驻页”思想。
-- **失败回退**：论文若检索失败则回退到截断；Claude `trySessionMemoryCompaction() → compactConversation()` 的两级回退同构。
+- **分层驱逐**：FIFO 队列的头/尾/锚点保留（Claude `compact_boundary.preservedSegment{head/tail/anchor}`，`src/services/compact/compact.ts:387`）即本书所称的「**边界集与保留集**」模式——boundary 划界、preserved 集不可动用，正是 OS 的“常驻页”思想。
+- **失败回退**：论文若检索失败则回退到截断；Claude `trySessionMemoryCompaction() → compactConversation()`（`src/services/compact/compact.ts:387`）的两级回退同构，即「**故障边界**」模式——压缩失败在本层归一化降级，不向 turn 上抛原始异常。
 
 #### A-MEM 2025 (NeurIPS 2025) — Zettelkasten 四阶段图
 
@@ -100,7 +102,7 @@ timeline
                                      vs 检索时（Retrieval-time）代理权（RAG）
 ```
 
-四阶段详解（`src/chapter-02-memory.md` 的术语与论文一致）：
+四阶段详解（[理论卷 T2](./theory/chapter-02-memory.md) 的术语与论文一致）：
 
 | 阶段 | 输入 | 动作 | 产物 | 代理权 |
 |------|------|------|------|--------|
@@ -144,7 +146,7 @@ I:  重要性门控（用户显式标记“记住”则 I→1.5）
                                     └─ 2025 A-MEM 的 Link 阶段（图边由 LLM 生成）
 ```
 
-> 收敛点：2025 年后“向量为召回、图为推理”成为共识。Zep 的 `fact extraction + temporal edge` 与 A-MEM 的 `Link` 本质同构：都是“写入时抽取结构化边”。FAISS 2017 仍是向量层的事实标准，七家若需本地向量检索几乎都绕不开其 IVF/PQ 思想（即使封装为 `sqlite-vec` 或 `lancedb`）。
+> 收敛点：2025 年后“向量为召回、图为推理”成为共识。Zep 的 `fact extraction + temporal edge` 与 A-MEM 的 `Link` 本质同构：都是“写入时抽取结构化边”。FAISS 2017 仍是向量层的事实标准，九家若需本地向量检索几乎都绕不开其 IVF/PQ 思想（即使封装为 `sqlite-vec` 或 `lancedb`）。
 
 ---
 
@@ -154,7 +156,7 @@ I:  重要性门控（用户显式标记“记住”则 I→1.5）
 
 综述将 Memory 按五个正交维度分解，任意 Memory 系统均可在这五维上打点：
 
-| 维度 | 取值 | 含义 | 论文中的例子 | 七家对位 |
+| 维度 | 取值 | 含义 | 论文中的例子 | 九家对位 |
 |------|------|------|-------------|----------|
 | **1. 时间 (Time)** | `short / medium / long` | 短期=当前 session，中期=跨天，长期=跨月/永久 | MemGPT 的 Main vs External 即 short vs long | Claude `Session` (short) vs `~/.claude/projects/<hash>/memory/` (long, 实验性) |
 | **2. 信息类型 (Information Type)** | `episodic / semantic / procedural` | 情景=某次对话事实，语义=用户偏好/知识，程序=技能/工作流 | Voyager 的技能库 = procedural；Generative Agents 的反思 = semantic | OpenCode `skill/` (procedural) vs Grok `xai-grok-memory` 的偏好事实 (semantic) |
@@ -221,7 +223,7 @@ A-MEM（写入时）:
   检索:  query ──► 图游走（已织好的网）──► 快速命中  ← 检索时反而更轻
 ```
 
-> 七家现状：**几乎全在“检索时”**。仅 Grok 的 `xai-grok-memory` 与 DeepSeek 的 `session-projection-cache` 的“写入时 enrichment”沾边；A-MEM 的完整四阶段在开源 Agent 中尚未有生产级落地（Letta 最接近）。这是本章 Lab 要补的缺口。
+> 九家现状：**几乎全在“检索时”**。仅 Grok 的 `xai-grok-memory` 与 DeepSeek 的 `session-projection-cache` 的“写入时 enrichment”沾边；A-MEM 的完整四阶段在开源 Agent 中尚未有生产级落地（Letta 最接近）。这是本章 Lab 要补的缺口。
 
 ---
 
@@ -291,13 +293,13 @@ A-MEM（写入时）:
               ├─ 读取全量 → 生成 summary/title → 写回 Session
               └─ 权限 * deny 保证不触文件，隔离干净（[理论卷 T3](./theory/chapter-03-context.md) 的“摘要隔离”最佳实践）
   ```
-- **可抄**：把 Compaction 做成“子 agent”而非函数，天然获得隔离、重试、Trace；`Truncate.wrap()` 在工具层统一截断，白名单与截断同源，避免“某工具绕过截断”导致 context 爆炸（Ch4 已述）。
+- **可抄**：把 Compaction 做成“子 agent”而非函数，天然获得隔离、重试、Trace；`Truncate.wrap()` 在工具层统一截断，白名单与截断同源，避免“某工具绕过截断”导致 context 爆炸（[Ch4](./ch04-tools.md) 已述）。
 - **局限**：隐藏 agent 的摘要仍是“压缩”，非“记忆织网”； procedural Memory（skill）与 episodic Memory（对话事实）分属两套存储，未统一为图。
 
 #### Claude — `compactConversation()` 四层中的 Memory 影子
 
 - **锚点**：`src/services/compact/compact.ts:387 compactConversation()` + `src/query.ts:219 query()` 的四层触发 + `src/services/compact/autoCompact.ts:62 AUTOCOMPACT_BUFFER=13K` + `src/utils/sessionStorage.ts getTranscriptPath()`
-- **形态**：Ch5 已述四层 `snip → micro → collapse → autocompact`，其中 `autocompact` 内：
+- **形态**：[Ch5](./ch05-context.md) 已述四层 `snip → micro → collapse → autocompact`，其中 `autocompact` 内：
   ```
   trySessionMemoryCompaction()  // 实验性记忆系统
     └─ 失败回退 → compactConversation()
@@ -320,22 +322,22 @@ A-MEM（写入时）:
               └─► convertToLlm() → Message[]  LLM 可见
                     压缩可在 AgentMessage 层完成，不污染 LLM 层的 Message 形状
   ```
-- **可抄**：教学最干净的“投影 vs 重写”示范；`estimateTokens` 由用户注入，零依赖。
+- **可抄**：教学最干净的「**投影而非改写**」示范（`packages/agent/src/types.ts:144 transformContext`）——Session 全量不动，只读投影进 LLM；`estimateTokens` 由用户注入、零依赖，亦合「**最小 Harness 税**」（`packages/agent/src/agent-loop.ts:155 runLoop` 约 200 行跑通全闭环）。
 - **局限**：生产需自建全套 Memory Pipeline；示例 `pruneOldMessages` 仅为固定轮数截断，若要达到 A-MEM 需在 `transformContext` 中接入 Note/Link/Evolution（Lab 即此）。
 
 #### Codex / Claw — 列表与轮数驱动的基线
 
-- **Codex** `codex-rs/core/src/context_manager/history.rs:93 ContextManager{items: Arc<Vec<_>>, history_version}` + `core/src/compact.rs`：`for_prompt(self)` 消费克隆并归一化（剥除不支持模态），`history_version` 递增保证血缘；无独立 Memory，Context 即 Memory。
-- **Claw** `rust/crates/runtime/src/session.rs Session{version,messages}` + `compact_after_turns=12`：固定轮数触发 `compact()`，原型级，已无法支撑 20+ turn 生产会话（Ch5 结论）。
+- **Codex** `codex-rs/core/src/context_manager/history.rs:93 ContextManager{items: Arc<Vec<_>>, history_version}` + `core/src/compact.rs`：`for_prompt(self)` 消费克隆并归一化（剥除不支持模态），`history_version` 递增、旧版不改（append-only），即「**只增不改**」模式在 Context 层的落地，血缘可重放；无独立 Memory，Context 即 Memory。
+- **Claw** `rust/crates/runtime/src/session.rs Session{version,messages}` + `compact_after_turns=12`：固定轮数触发 `compact()`，原型级，已无法支撑 20+ turn 生产会话（[Ch5](./ch05-context.md) 结论）。
 
 ### 6.3.3 与 RAG 的边界辨析：何时用 RAG，何时用 Memory
 
-| 维度 | RAG | Memory (Agentic) | 本书七家的实践 |
+| 维度 | RAG | Memory (Agentic) | 本书九家的实践 |
 |------|-----|-------------------|----------------|
 | **问题** | “外部知识库里有答案” | “过去的交互中有答案” | RAG 适合文档 QA；Memory 适合“你上次说过…” |
 | **写入** | 切块→向量入库（无智能） | Note/Link/Evolution（有智能） | DeepSeek `session-projection-cache` 偏 RAG；Grok `xai-grok-memory` 偏 Memory |
 | **检索** | 向量近邻（单跳） | 图游走（多跳） | [理论卷 T2](./theory/chapter-02-memory.md) 的“向量为召回、图为推理” |
-| **评估** | Recall@k / MRR | LongBench / LoCoMo（多会话一致性） | 七家均未内建 LongBench 评测，依赖外部 harness |
+| **评估** | Recall@k / MRR | LongBench / LoCoMo（多会话一致性） | 九家均未内建 LongBench 评测，依赖外部 harness |
 | **叠加** | 粗召回 | 精排与重写 | 生产推荐：RAG 做候选，Memory 做精排与冲突消解（Mem0 + A-MEM 混合） |
 
 > 反例：若把“用户偏好”丢进 RAG 向量库，query“帮我订餐”时向量近邻可能召回“用户三年前的地址”，而 Memory 的 Evolution 阶段已将地址更新为最新。**RAG 无演化，Memory 有演化**，这是边界的核心。
@@ -365,7 +367,7 @@ A-MEM（写入时）:
   去重/冲突      持久化         边构建        重排           归档
 ```
 
-| 阶段 | 关键决策 | 选项 | 权衡 | 七家对位 |
+| 阶段 | 关键决策 | 选项 | 权衡 | 九家对位 |
 |------|----------|------|------|----------|
 | **Ingestion** | 抽取粒度 | 原文直存 vs 原子 note vs 结构化事实 | 原文便宜但冗余，note 贵但可演化 | Pi 原文直存 vs A-MEM note；Mem0 的抽取-更新即 Ingestion |
 | | 去重与冲突 | 追加 vs 去重 vs 合并重写 | 追加简单但膨胀，去重需 LLM 判断 | Mem0 去重 vs A-MEM Evolution 合并；Grok `dedup_duplicate_tool_results` |
@@ -398,7 +400,7 @@ A-MEM（写入时）:
                 └─ 写入吞吐高？→ 写入时抽取用小模型（Haiku/本地 7B），检索时再用大模型精排
 ```
 
-> 工程建议：**默认 OS 分页，按需叠加 Zettelkasten 与衰减**。七家中 Grok 最接近此叠加（分页 + memory_flush + 图实验）；若从零搭建，先抄 Claude 的四层防线跑通 20 轮，再按 Lab 接入 A-MEM 的 Note/Link，最后叠 FadeMem 的 `S(t)` 遗忘。
+> 工程建议：**默认 OS 分页，按需叠加 Zettelkasten 与衰减**。九家中 Grok 最接近此叠加（分页 + memory_flush + 图实验）；若从零搭建，先抄 Claude 的四层防线跑通 20 轮，再按 Lab 接入 A-MEM 的 Note/Link，最后叠 FadeMem 的 `S(t)` 遗忘。
 
 ### 6.4.3 成本与质量的定量权衡（估算）
 
@@ -409,11 +411,11 @@ A-MEM（写入时）:
 | A-MEM 四阶段（Haiku 写入） | 4–6×（+ Note/Link/Evolution） | 20ms（图已织好） | **0.71** | 1.2×（Evolution 去重） |
 | A-MEM + FadeMem | 4–6× | 20ms | 0.71 | **0.9×**（衰减回收） |
 
-> 数字为论文 Table 2 + 工程经验的外推，非七家实测。核心规律：**写入时多付的成本，在检索时与存储上成倍赚回**。若你的 Agent 读多写少（如伴侣型），A-MEM 划算；若写多读少（如批量处理），朴素 RAG 更经济。
+> 数字为论文 Table 2 + 工程经验的外推，非九家实测。核心规律：**写入时多付的成本，在检索时与存储上成倍赚回**。若你的 Agent 读多写少（如伴侣型），A-MEM 划算；若写多读少（如批量处理），朴素 RAG 更经济。
 
 ---
 
-## 6.5 未来：Memory 的五条演进线与七家预测
+## 6.5 未来：Memory 的五条演进线与九家预测
 
 ### 6.5.1 五条演进线
 
@@ -439,7 +441,7 @@ A-MEM（写入时）:
   - **泄露**：Memory 跨会话携带敏感信息（`~/.claude/projects/<hash>/memory/` 若未隔离则跨项目泄露）。
   - **固化**：错误记忆经 Evolution 被“洗白”为事实，难以纠正。
 - **对策**：[理论卷 T4](./theory/chapter-04-runtime.md) 提出的 `ContextHygiene.sanitize_tool_output`+ 写入时校验（A-MEM 的 Link 阶段加 `contradicts` 边即一种校验）+ 遗忘作为安全阀（FadeMem 的快速衰减可“自然排毒”）。
-- **七家对位**：OpenCode `permission:* deny` 的隐藏 agent 与 Grok `SENT_BEARER_PREFIX_LEN=12` 的截断，都是 Memory Safety 的雏形。
+- **九家对位**：OpenCode `permission:* deny` 的隐藏 agent 与 Grok `SENT_BEARER_PREFIX_LEN=12` 的截断，都是 Memory Safety 的雏形。
 
 #### 4) 端侧 Memory 小模型化
 
@@ -466,19 +468,21 @@ A-MEM（写入时）:
 | **Pi** | `transformContext` 外置 | 官方提供 `pi-extension-memory`（A-MEM 最小实现，见 Lab） | 成为“Memory 教学标准”——文档即 Lab，Lab 即扩展 | 社区是否贡献 `pi-extension-memory` |
 | **Claw** | `compact_after_turns=12` 原型 | 补齐 token 预算驱动（`chars/4` + `window-buffer`），接入 `sqlite-backend` | 若未补齐则被 OpenCode/Pi 替代，原型价值归零 | 是否有人持续维护 |
 
-> 共同收敛：**三件套**——`MemoryProvider` 标准接口（memorywire）+ 写入时小模型抽取（Haiku/7B）+ 遗忘作为一等公民（FadeMem）。七家谁先集齐，谁就在“长期伴侣”赛道卡位。
+> 注：本表实列七家；**Qwen-Agent**（RAG-as-Memory，见 6.3.1）的演进取决于上游框架发版，**Hermes**（自策展记忆，见 6.3.1）由 Honcho 生态驱动，两者不在本书源码对证范围内，故不另作预测。
+
+> 共同收敛：**三件套**——`MemoryProvider` 标准接口（memorywire）+ 写入时小模型抽取（Haiku/7B）+ 遗忘作为一等公民（FadeMem）。九家谁先集齐，谁就在“长期伴侣”赛道卡位。
 
 ### 6.5.3 给读者的选型建议（2026.08 快照）
 
 ```
 从零搭建长期记忆 Agent：
 
-1. 跑通 Claude 四层防线（Ch5）→ 保证 20 轮不爆窗
+1. 跑通 Claude 四层防线（[Ch5](./ch05-context.md)）→ 保证 20 轮不爆窗
 2. 接入本章 Lab 的最小 Zettelkasten（Note/Link/Retrieval）→ 获得多跳能力
 3. 叠加 FadeMem 的 S(t) 衰减 → 控制膨胀
 4. 预留 memorywire 的 MemoryProvider 接口 → 未来可换后端（FAISS/Zep/Cognee）
 
-已在用七家之一：
+已在用九家之一：
 
 - 用 Claude/Grok → 等官方 Memory 毕业，期间用 Lab 的外置 Memory 补位
 - 用 DeepSeek/OpenCode → 在 Session 层加 A-MEM 的异步 Note/Link 任务
@@ -496,7 +500,7 @@ A-MEM（写入时）:
 2. **写入时 vs 检索时**：你的 Agent 每天写入 10K 条记忆、每天检索 100 次，每条写入时 Note/Link 成本为 1K tokens，向量入库成本为 0.1K tokens。分别计算 RAG 与 A-MEM 的日成本，哪种更划算？若读写比反过来（100 写 / 10K 读）呢？
 3. **遗忘的伦理**：FadeMem 的 `S(t)` 若对“用户明确说‘永远记住’”的记忆仍按 `exp(-λt)` 衰减，会违背用户意图。如何在公式中体现 `I`（重要性门控）与显式 `pin` 的交互？试设计 `pin` 的数据结构与衰减短路逻辑。
 4. **RAG 与 Memory 的边界**：用户问“公司 2024 年的 OKR 是什么”与“你还记得我上次说的 OKR 偏好吗”，分别该走 RAG 还是 Memory？若将两者混在同一向量库，会出现什么具体的错误召回？
-5. **七家对证**：Pi 的 `transformContext` 若直接返回 `messages.slice(-10)`（固定截断），与 Claude 的 `compactConversation()` 在“可重放性”（`Session.fork()` 后能否恢复全量）上有何本质差异？用 `Session extends Vec<Message>` 的不变量 I1/I3 解释。
+5. **九家对证**：Pi 的 `transformContext` 若直接返回 `messages.slice(-10)`（固定截断），与 Claude 的 `compactConversation()` 在“可重放性”（`Session.fork()` 后能否恢复全量）上有何本质差异？用 `Session extends Vec<Message>` 的不变量 I1/I3 解释。
 
 ### Lab：实现最小 Zettelkasten（Note / Link / Retrieval，约 120 行 TS）
 
@@ -583,7 +587,7 @@ function decay(graph: MemoryGraph, now = Date.now()) {
 - **坑 1**：在 `transformContext` 中同步调 LLM 做 Note/Link，导致每轮 turn 延迟 +2s。**解**：写入时异步（`setImmediate` 或后台队列），检索时只读图（A-MEM 的写入/检索分离）。
 - **坑 2**：图边权重未归一，`expanded` 爆炸式扩展。**解**：每 note 最多保留 top-3 边，`weight < 0.3` 丢弃（稀疏化）。
 - **坑 3**：`strength` 衰减后无 `pin` 机制，用户“永远记住”被忘。**解**：`note.pinned: boolean`，`decay()` 中 `if (pinned) continue`。
-- **坑 4**：与 Prompt Caching 冲突——每次 `retrieve` 拼入的 `[Memory]` 位置抖动导致 cache miss。**解**：固定拼在 `system` 末尾的独立 `MemoryBlock`，`cache_control: ephemeral` 断点稳定（Ch5 的教训）。
+- **坑 4**：与 Prompt Caching 冲突——每次 `retrieve` 拼入的 `[Memory]` 位置抖动导致 cache miss。**解**：固定拼在 `system` 末尾的独立 `MemoryBlock`，`cache_control: ephemeral` 断点稳定（[Ch5](./ch05-context.md) 的教训）。
 
 **延伸**：将 `knnSearch` 换为 `FAISS`（`hnswlib-wasm` 或 `sqlite-vec`）、将 `jaccard` 换为 embedding 余弦、将 `decay` 换为可微 `S(t)`，即得生产级雏形；再接入 `memorywire` 的 `MemoryProvider` 接口，即可跨 Agent 携带。
 
@@ -593,9 +597,9 @@ function decay(graph: MemoryGraph, now = Date.now()) {
 
 1. **历史是三条路的收敛**：OS 分页（怎么不爆窗）→ Zettelkasten（怎么织网与演化）→ 衰减曲线（怎么自然忘），三者正交，叠加使用。
 2. **原理是代理权的迁移**：RAG 把智能放在检索时，Agentic Memory（A-MEM）把智能前移到写入时；五维分类是选型工具，四范式是成本模型。
-3. **工程是五步流水线**：Ingestion→Storage→Indexing→Retrieval→Forgetting，每步都有“便宜但笨 vs 贵但准”的权衡；七家当前多在“检索时+分页”，下一步是“写入时+图+衰减”的收敛。
+3. **工程是五步流水线**：Ingestion→Storage→Indexing→Retrieval→Forgetting，每步都有“便宜但笨 vs 贵但准”的权衡；九家当前多在“检索时+分页”，下一步是“写入时+图+衰减”的收敛。
 
-> 下一章（Ch7 Session/Trace）将把“全量事实如何不丢”（`Session.append` + `history_version/turn_capture` + `repair_dangling_tool_calls`）与“每 turn 如何可观测”（`tengu_*`/`codex-otel`/`EventV2Bridge`）逐行拆开——Memory 再智能，也需 Session 的“可重放”与 Trace 的“可审计”托底。
+> 下一章（[Ch7](./ch06-session.md) Session/Trace）将把“全量事实如何不丢”（`Session.append` + `history_version/turn_capture` + `repair_dangling_tool_calls`）与“每 turn 如何可观测”（`tengu_*`/`codex-otel`/`EventV2Bridge`）逐行拆开——Memory 再智能，也需 Session 的“可重放”与 Trace 的“可审计”托底。
 
 ---
 
@@ -603,5 +607,5 @@ function decay(graph: MemoryGraph, now = Date.now()) {
 
 - 论文：MemGPT arXiv 2310.08560 (2023), Voyager arXiv 2305.16291 (2023), Generative Agents UIST 2023 (Stanford), Mem0 arXiv 2504.19413 (2025.04；开源 2024.10), Letta 2024.10, A-MEM arXiv 2502.12110 / NeurIPS 2025, FadeMem 2026.02, Memory in LLM Era 综述 2026.03, memorywire 2026.04, FAISS 2017, Zep arXiv 2501.13956 (2025) / Cognee 2023-2024
 - 源码：`claude-code-haha/src/services/compact/compact.ts:387`, `xai-grok-memory`, `xai-grok-agent/src/compaction.rs:CompactionPolicy`, `xai-chat-state/src/actor/state.rs:estimate_item_tokens`, `deepseek-harness/packages/session/session-projection-cache`, `packages/compaction/compaction-basic`, `opencode/packages/opencode/src/agent/agent.ts:35`, `packages/opencode/src/tool/truncate.ts`, `codex-rs/core/src/context_manager/history.rs:93`, `pi/packages/agent/src/agent-loop.ts:155 runLoop`, `pi/docs/book/src/12-memory-projection.md`
-- 衔接：[理论卷 T2](./theory/chapter-02-memory.md) (MemGPT/A-MEM/FadeMem) + `src/chapter-03-context.md` (Token 经济学与摘要)
+- 衔接：[理论卷 T2](./theory/chapter-02-memory.md) (MemGPT/A-MEM/FadeMem) + [理论卷 T3](./theory/chapter-03-context.md) (Token 经济学与摘要)
 
