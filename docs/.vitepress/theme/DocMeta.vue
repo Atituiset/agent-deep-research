@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch, nextTick } from 'vue'
+import { useRoute } from 'vitepress'
 
 const chapter = ref<string | null>(null)
 const minutes = ref<number | null>(null)
@@ -7,6 +8,7 @@ const fontStep = ref(1)
 
 const SIZES = [15.5, 16.5, 18]
 const KEY = 'adr-font-step'
+const route = useRoute()
 
 function applyFont(step: number) {
   const doc = document.querySelector<HTMLElement>('.vp-doc')
@@ -19,7 +21,11 @@ function cycleFont() {
   applyFont((fontStep.value + 1) % SIZES.length)
 }
 
-onMounted(() => {
+function compute() {
+  // reset first — pages without a chapter number must clear the old chip
+  chapter.value = null
+  minutes.value = null
+
   const h1 = document.querySelector('.vp-doc h1')
   const m = h1?.textContent?.match(/第\s*(\d+)\s*章/)
   if (m) chapter.value = m[1].padStart(2, '0')
@@ -28,10 +34,23 @@ onMounted(() => {
   const chars = text.replace(/\s+/g, '').length
   minutes.value = Math.max(1, Math.round(chars / 450))
 
+  applyFont(fontStep.value) // .vp-doc node is replaced on each navigation
+}
+
+onMounted(() => {
   let saved = 1
   try { saved = Number(localStorage.getItem(KEY) ?? '1') } catch {}
-  applyFont(Number.isInteger(saved) && saved >= 0 && saved <= 2 ? saved : 1)
+  if (Number.isInteger(saved) && saved >= 0 && saved <= 2) fontStep.value = saved
+  compute()
 })
+
+watch(
+  () => route.path,
+  async () => {
+    await nextTick()
+    compute()
+  },
+)
 </script>
 
 <template>
