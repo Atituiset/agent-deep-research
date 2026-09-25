@@ -8,13 +8,100 @@ export default defineConfig({
   description:
     'Agent Infra 知识地图：以 Claude Code / Codex / Grok / DeepSeek / OpenCode / Pi / Claw / Qwen-Agent / Hermes 九家实现为教材，每章按「论文脉络 → 原理深潜 → 源码对证 → 权衡结论 → 未来方向」五段式展开',
 
-  // GitHub Pages 项目站点 https://<org>.github.io/agent-deep-research/
+  // GitHub Pages 项目站点 https://atituiset.github.io/agent-deep-research/
   base: '/agent-deep-research/',
 
   lastUpdated: true,
   cleanUrls: true,
 
-  head: [['meta', { name: 'theme-color', content: '#5672cd' }]],
+  head: [
+    ['meta', { name: 'theme-color', content: '#2e7d5b' }],
+    ['meta', { property: 'og:title', content: 'Agent Deep Research — How 9 Agent Harnesses Really Work' }],
+    [
+      'meta',
+      {
+        property: 'og:description',
+        content:
+          'A source-anchored comparative study of 9 real agent implementations — Claude Code, Codex, OpenCode, Pi, DeepSeek Harness, Grok Build, Claw, Qwen-Agent, Hermes — distilled into a shared model, a one-pager, and a learning path.',
+      },
+    ],
+    ['meta', { property: 'og:image', content: 'https://atituiset.github.io/agent-deep-research/og-image.png' }],
+    ['meta', { property: 'og:type', content: 'website' }],
+    ['meta', { name: 'twitter:card', content: 'summary_large_image' }],
+  ],
+
+  locales: {
+    root: {
+      label: '简体中文',
+      lang: 'zh-CN',
+    },
+    en: {
+      label: 'English',
+      lang: 'en-US',
+      link: '/en/',
+      title: 'Agent Deep Research',
+      titleTemplate: 'How 9 Agent Harnesses Really Work',
+      description:
+        'How 9 agent harnesses really work: a source-anchored comparative study of Claude Code, Codex, OpenCode, Pi, DeepSeek Harness, Grok Build, Claw, Qwen-Agent, and Hermes',
+      themeConfig: {
+        nav: [
+          { text: 'Home', link: '/en/' },
+          { text: 'Preface', link: '/en/preface' },
+          { text: 'One-Pager', link: '/en/ch09-one-pager' },
+          { text: 'Landscape', link: '/en/ch01-landscape' },
+        ],
+
+        sidebar: [
+          { text: 'Preface', link: '/en/preface' },
+          {
+            text: 'I Getting Started: Shared Knowledge',
+            collapsed: false,
+            items: [
+              { text: 'Ch1 Landscape & Positioning', link: '/en/ch01-landscape' },
+              { text: 'Ch2 The Common Model: Six Pieces', link: '/en/ch02-common-model' },
+            ],
+          },
+          {
+            text: 'II Reference: Quick Lookup',
+            collapsed: false,
+            items: [{ text: 'Ch13 The One-Pager', link: '/en/ch09-one-pager' }],
+          },
+          {
+            text: 'III Synthesis: Design Philosophy',
+            collapsed: false,
+            items: [
+              { text: 'Ch14 Harness Philosophy: Nine Design Schools', link: '/en/ch14-harness-philosophy' },
+            ],
+          },
+        ],
+
+        outline: {
+          level: [2, 3],
+          label: 'On this page',
+        },
+
+        docFooter: { prev: 'Previous', next: 'Next' },
+
+        lastUpdatedText: 'Last updated',
+        returnToTopLabel: 'Back to top',
+        sidebarMenuLabel: 'Menu',
+        darkModeSwitchLabel: 'Appearance',
+        lightModeSwitchTitle: 'Switch to light mode',
+        darkModeSwitchTitle: 'Switch to dark mode',
+        skipToContentLabel: 'Skip to content',
+
+        editLink: {
+          pattern: 'https://github.com/Atituiset/agent-deep-research/edit/main/docs/:path',
+          text: 'Edit this page on GitHub',
+        },
+
+        footer: {
+          message: 'Released under the MIT License',
+          copyright: 'Copyright © 2026 agent-deep-research',
+        },
+      },
+    },
+  },
 
   themeConfig: {
     // https://vitepress.dev/reference/default-theme-config
