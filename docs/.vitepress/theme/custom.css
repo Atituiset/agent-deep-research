@@ -236,11 +236,23 @@
   border-bottom: 1px solid var(--vp-c-divider);
 }
 
-.VPNavBar .title {
+.VPNavBar .title,
+.VPNavBarTitle .title {
   font-family: var(--vp-font-family-display);
   font-weight: 600;
-  font-size: 1.15rem;
-  letter-spacing: 0.01em;
+  font-size: 1.05rem;
+  letter-spacing: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+@media (max-width: 768px) {
+  .VPNavBar .title,
+  .VPNavBarTitle .title {
+    font-size: 0.95rem;
+  }
 }
 
 /* ---------- 首页 ---------- */
