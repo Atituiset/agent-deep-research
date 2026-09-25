@@ -1114,6 +1114,8 @@ require_approval if { regex.match("rm -rf", input.args.command) }
 10. ★★★ **Policy-as-Code 的边界**：把 4.2.3 的 ruleset 改写成 4.5.4 的 Rego 风格策略后，哪类规则最难表达（提示：考虑"该工具在过去 5 分钟内是否已被批准过同类操作"这类带状态的策略）？这暴露了静态规则表与策略引擎各自的什么极限？
 
 ## Lab 4：实现一个带 schema 校验的 Tool Router
+> 🧪 **可运行版本**：[`labs/lab02_tool_router/`](https://github.com/Atituiset/agent-deep-research/tree/main/labs/lab02_tool_router)（Python 零依赖，`python3 -m unittest` 即验收）。
+
 
 **目标**：在 `my-agent` 的工具层实现同源注册表 + 四级可见性 + 横切权限 + 并行分桶，对齐 Codex `build_tool_router()`（`codex-rs/core/src/tools/spec_plan.rs:117`）的每轮重建语义，最终得到与 Claude/Codex 对等的 Tool 子系统骨架。
 

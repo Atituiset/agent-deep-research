@@ -1086,6 +1086,8 @@ Session.append（唯一写路径，可重放）
 5. **推测执行的回滚**：Speculative Loop 中，若推测分支的 `Session.append({speculative:true})` 未正确 `rollback`，会对 `Session.fork()` 与 `history_version` 产生何种污染？应如何设计 `commit/rollback` 与 `turn_start_offset` 的协同？
 
 ## Lab 3：从 200 行到生产 Loop
+> 🧪 **可运行版本**：[`labs/lab01_minimal_loop/`](https://github.com/Atituiset/agent-deep-research/tree/main/labs/lab01_minimal_loop)（Python 零依赖，`python3 -m unittest` 即验收）。
+
 
 **目标**：在 Pi 的 `runLoop` 上逐步加闸，最终得到与 Claude/Codex 对等的可中断 Loop。
 

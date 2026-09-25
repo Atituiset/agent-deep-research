@@ -795,6 +795,8 @@ RadixAttention（SGLang, 前缀树）：
 ---
 
 ## Lab 5：实现投影函数 `transformContext` + compaction 触发（约 150 行 TS）
+> 🧪 **可运行版本**：[`labs/lab03_context_projection/`](https://github.com/Atituiset/agent-deep-research/tree/main/labs/lab03_context_projection)（Python 零依赖，`python3 -m unittest` 即验收）。
+
 
 **目标**：在 `my-agent`（或 Pi 的 `transformContext` 注入点）实现"Session「只增不改」、Context 按预算投影"的最小闭环：`chars/4` 估算 → `T = W × 85%` 触发 → snip + 摘要两层压缩 → 投影输出。全程验证「投影而非改写」——Session 全量不动，`fork()` 后可回放压缩前历史。
 
