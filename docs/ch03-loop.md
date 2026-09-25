@@ -128,6 +128,10 @@ SWE-agent / CodeAct / OpenHands (2024)
 
 ### 3.2.1 Loop 的形式化定义
 
+![Agent Loop：Thought → Action → Observation 闭环](/figures/fig-3-1-agent-loop.svg)
+
+<p class="fig-caption">图 3-1 · Agent Loop 的最小闭环：模型只产出"采样一次"，Thought→Action→Observation 的循环由模型外面的程序驱动</p>
+
 最小 Loop 是一个**带预算与取消的 Kleisli 循环**（`Message → M Message` 的重复绑定）：
 
 ```ts

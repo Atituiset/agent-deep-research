@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 560" role="img" aria-label="Agent Loop：Thought → Action → Observation 闭环">
+  <defs>
+    <style>
+      .lbl { font-family: Inter, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif; fill: #1c2b24; }
+      .sub { font-family: "JetBrains Mono", Menlo, monospace; fill: #7b8a83; }
+      .mono { font-family: "JetBrains Mono", Menlo, monospace; }
+    </style>
+  </defs>
+
+  <!-- light card (reads on both light & dark site themes) -->
+  <rect x="16" y="16" width="1168" height="528" rx="16" fill="#ffffff" stroke="rgba(28,43,36,0.12)"/>
+
+  <!-- ring base -->
+  <circle cx="380" cy="280" r="170" fill="none" stroke="rgba(28,43,36,0.18)" stroke-width="1.5"/>
+
+  <!-- flow arcs (clockwise: Thought → Action → Observation → Thought) -->
+  <path d="M 443.7 122.4 A 170 170 0 0 1 548 304" fill="none" stroke="#40514a" stroke-width="1.8"/>
+  <path d="M 485 414 A 170 170 0 0 1 275 414" fill="none" stroke="#40514a" stroke-width="1.8"/>
+  <path d="M 212 304 A 170 170 0 0 1 316 121" fill="none" stroke="#40514a" stroke-width="1.8"/>
+
+  <!-- nodes -->
+  <circle cx="380" cy="110" r="56" fill="#f3f1ea" stroke="#2e7d5b" stroke-width="2"/>
+  <circle cx="527" cy="365" r="56" fill="#f3f1ea" stroke="rgba(28,43,36,0.35)" stroke-width="1.5"/>
+  <circle cx="233" cy="365" r="56" fill="#f3f1ea" stroke="rgba(28,43,36,0.35)" stroke-width="1.5"/>
+
+  <text x="380" y="106" text-anchor="middle" class="lbl" font-size="19" font-weight="600">Thought</text>
+  <text x="380" y="130" text-anchor="middle" class="lbl" font-size="15" fill="#40514a">意图</text>
+  <text x="527" y="361" text-anchor="middle" class="lbl" font-size="19" font-weight="600">Action</text>
+  <text x="527" y="385" text-anchor="middle" class="lbl" font-size="15" fill="#40514a">执行</text>
+  <text x="233" y="361" text-anchor="middle" class="lbl" font-size="19" font-weight="600">Observation</text>
+  <text x="233" y="385" text-anchor="middle" class="lbl" font-size="15" fill="#40514a">观察</text>
+
+  <text x="380" y="272" text-anchor="middle" class="mono" font-size="20" fill="#1c2b24" font-weight="600">Agent Loop</text>
+  <text x="380" y="298" text-anchor="middle" class="mono" font-size="13" fill="#7b8a83">while (true)</text>
+
+  <!-- tour dot (accent) -->
+  <circle cx="540" cy="222" r="9" fill="#2e7d5b"/>
+  <circle cx="540" cy="222" r="14" fill="none" stroke="#2e7d5b" stroke-opacity="0.35"/>
+
+  <!-- arrowheads LAST (on top of everything) -->
+  <polygon points="548,304 543,289 557,291" fill="#40514a"/>
+  <polygon points="275,414 290,417 282,428" fill="#40514a"/>
+  <polygon points="316,121 306,133 300,120" fill="#40514a"/>
+
+  <!-- right: pseudo-code panel -->
+  <rect x="640" y="80" width="480" height="400" rx="12" fill="#181d1a"/>
+  <circle cx="1096" cy="104" r="5" fill="#63b48e"/>
+  <text x="1110" y="109" class="mono" font-size="12" fill="#82918a">running</text>
+  <text x="664" y="104" class="mono" font-size="13" fill="#82918a">agent-loop.ts</text>
+
+  <g class="mono" font-size="16.5" fill="#e8f0eb">
+    <text x="664" y="152"><tspan fill="#63b48e">while</tspan> (<tspan fill="#63b48e">true</tspan>) {</text>
+    <text x="688" y="188">thought = <tspan fill="#e8a55a">model</tspan>(ctx)</text>
+    <text x="688" y="224">action = env.<tspan fill="#e8a55a">run</tspan>(thought)</text>
+    <text x="688" y="260">observation = env.<tspan fill="#e8a55a">read</tspan>()</text>
+    <text x="688" y="296">ctx += observation</text>
+    <text x="664" y="332">}</text>
+  </g>
+
+  <line x1="664" y1="368" x2="1096" y2="368" stroke="rgba(232,240,235,0.14)"/>
+  <text x="664" y="402" class="mono" font-size="13.5" fill="#82918a">模型只产出"采样一次"——</text>
+  <text x="664" y="428" class="mono" font-size="13.5" fill="#82918a">继续运行的是模型外面的程序</text>
+</svg>

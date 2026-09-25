@@ -148,6 +148,10 @@ BFCL v1 (AST) → BFCL v2 (可执行+并行) → ToolSandbox (状态化) → BFC
 
 Tool 子系统的五根支柱——**同源、可见性、权限、沙箱、并行**——缺一即塌。以下逐根拆解，每根给出形式化、伪代码与失败案例。
 
+![Tool Calling 流水线：Schema 注册、结构化调用、Tool Router、审批与沙箱双闸门执行、结果回填闭环](/figures/fig-4-1-tool-pipeline.svg)
+
+<p class="fig-caption">图 4-1 · Tool Calling 流水线五步闭环：Schema 注册 → 模型产出结构化 tool_call → Tool Router 校验并按名路由 → 经审批与沙箱两道闸门执行 → tool_result 回填上下文触发下一轮采样</p>
+
 ### 4.2.1 支柱一：规格与执行同源 (ToolSpec ↔ ToolExecutor Co-location)
 
 **问题：Schema 漂移 (Schema Drift)**

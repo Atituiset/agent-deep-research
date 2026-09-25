@@ -616,6 +616,10 @@ function getThreshold(W: number): number {
 
 Pi 在 `docs/book/src/12-memory-projection.md` 的术语最清晰：
 
+![Context 投影与压缩：Session 全量历史经 project() 投影为 Working Context，溢出段分流至 long_term.store，压缩摘要重新投影回窗口](/figures/fig-5-1-context-projection.svg)
+
+<p class="fig-caption">图 5-1 · Context 是 Session 的投影：窗口溢出段分流进 long_term.store（投影而非改写），压缩摘要再重新投影回窗口，Session 全程只增不改</p>
+
 ```
 Session：全量事实（AgentMessage[]，持久化，永不丢失）
   │

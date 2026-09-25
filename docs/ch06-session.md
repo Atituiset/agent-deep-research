@@ -198,6 +198,12 @@ type SessionEvent =
 2. **幂等 fold**：同一 log 重放两遍结果一致——`request/header|context` 需去重（DeepSeek `canonicalHeader/headerEquals`）；
 3. **先写后调**：user 消息在 `callModel()` 前落盘（Claude `QueryEngine.ts:451 recordTranscript` 预写），崩溃时"用户说过什么"永不丢。
 
+把扁平的事件流按容器归层，就是九家共用的 Thread / Turn / Item 三层结构：
+
+![Thread / Turn / Item 三层结构：Thread 承载长期任务，Turn 是用户推动任务的一次过程，Item 是 Turn 内的最小追加单元](/figures/fig-7-1-thread-turn-item.svg)
+
+<p class="fig-caption">图 7-1 · Thread / Turn / Item 三层结构：Thread 承载长期任务，Turn 记录用户推动任务的一次过程，Item 是 Turn 内的最小追加单元；落盘时逐行展开为 rollout.jsonl，或 normalize 为 SQLite 的 thread / turn / item 三表</p>
+
 ### 7.2.2 turn/start 边界不丢的三种实现
 
 "崩溃后从哪个事件续跑"是持久化的核心难题。九家给出三种等价但成本不同的方案：

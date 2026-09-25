@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" role="img" aria-label="Thread / Turn / Item 三层结构树：Thread 承载长期任务，Turn 是用户推动任务的一次过程，Item 是 Turn 内的最小追加单元">
+  <defs>
+    <style>
+      .lbl { font-family: Inter, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif; fill: #1c2b24; }
+      .sub { font-family: "JetBrains Mono", Menlo, monospace; fill: #7b8a83; }
+      .mono { font-family: "JetBrains Mono", Menlo, monospace; }
+    </style>
+  </defs>
+
+  <!-- light card (reads on both light & dark site themes) -->
+  <rect x="16" y="16" width="1168" height="568" rx="16" fill="#ffffff" stroke="rgba(28,43,36,0.12)"/>
+
+  <!-- Thread container (accent #1) -->
+  <rect x="100" y="60" width="640" height="92" rx="12" fill="#f3f1ea" stroke="#2e7d5b" stroke-width="2"/>
+  <text x="420" y="100" text-anchor="middle" class="lbl" font-size="20" font-weight="600">Thread<tspan dx="12" font-size="15" font-weight="400" fill="#40514a">长期任务</tspan></text>
+  <text x="420" y="128" text-anchor="middle" class="sub" font-size="12.5">thread_id · 跨多次 Turn 的 append-only 容器</text>
+
+  <!-- tree connectors: Thread → Turn 1 / Turn 2 -->
+  <path d="M 420 152 L 420 172" fill="none" stroke="rgba(28,43,36,0.35)" stroke-width="1.5"/>
+  <path d="M 224 172 L 576 172" fill="none" stroke="rgba(28,43,36,0.35)" stroke-width="1.5"/>
+  <path d="M 224 172 L 224 182" fill="none" stroke="rgba(28,43,36,0.35)" stroke-width="1.5"/>
+  <path d="M 576 172 L 576 182" fill="none" stroke="rgba(28,43,36,0.35)" stroke-width="1.5"/>
+
+  <!-- Turn 1 -->
+  <rect x="64" y="196" width="320" height="340" rx="12" fill="#f3f1ea" stroke="rgba(28,43,36,0.18)"/>
+  <text x="88" y="230" class="lbl" font-size="16" font-weight="600">Turn 1</text>
+  <text x="88" y="254" class="lbl" font-size="12" fill="#40514a">用户推动任务的一次过程</text>
+  <line x1="224" y1="302" x2="224" y2="478" stroke="rgba(28,43,36,0.18)" stroke-width="1.5"/>
+  <rect x="88" y="286" width="272" height="32" rx="16" fill="#ffffff" stroke="rgba(28,43,36,0.18)"/>
+  <text x="224" y="307" text-anchor="middle" class="mono" font-size="12.5" fill="#1c2b24">User Input</text>
+  <rect x="88" y="330" width="272" height="32" rx="16" fill="#ffffff" stroke="rgba(28,43,36,0.18)"/>
+  <text x="224" y="351" text-anchor="middle" class="mono" font-size="12.5" fill="#1c2b24">Reasoning · Agent Message</text>
+  <rect x="88" y="374" width="272" height="32" rx="16" fill="#ffffff" stroke="rgba(28,43,36,0.18)"/>
+  <text x="224" y="395" text-anchor="middle" class="mono" font-size="12.5" fill="#1c2b24">Command Execution · File Change</text>
+  <rect x="88" y="418" width="272" height="32" rx="16" fill="#ffffff" stroke="rgba(28,43,36,0.18)"/>
+  <text x="224" y="439" text-anchor="middle" class="mono" font-size="12.5" fill="#1c2b24">Tool Call · Approval</text>
+  <rect x="88" y="462" width="272" height="32" rx="16" fill="#ffffff" stroke="rgba(28,43,36,0.18)"/>
+  <text x="224" y="483" text-anchor="middle" class="mono" font-size="12.5" fill="#1c2b24">Turn Completed</text>
+
+  <!-- Turn 2 -->
+  <rect x="416" y="196" width="320" height="340" rx="12" fill="#f3f1ea" stroke="rgba(28,43,36,0.18)"/>
+  <text x="440" y="230" class="lbl" font-size="16" font-weight="600">Turn 2</text>
+  <text x="440" y="254" class="lbl" font-size="12" fill="#40514a">用户推动任务的一次过程</text>
+  <line x1="576" y1="302" x2="576" y2="478" stroke="rgba(28,43,36,0.18)" stroke-width="1.5"/>
+  <rect x="440" y="286" width="272" height="32" rx="16" fill="#ffffff" stroke="rgba(28,43,36,0.18)"/>
+  <text x="576" y="307" text-anchor="middle" class="mono" font-size="12.5" fill="#1c2b24">User Input</text>
+  <rect x="440" y="330" width="272" height="32" rx="16" fill="#ffffff" stroke="rgba(28,43,36,0.18)"/>
+  <text x="576" y="351" text-anchor="middle" class="mono" font-size="12.5" fill="#1c2b24">Reasoning · Agent Message</text>
+  <rect x="440" y="374" width="272" height="32" rx="16" fill="#ffffff" stroke="rgba(28,43,36,0.18)"/>
+  <text x="576" y="395" text-anchor="middle" class="mono" font-size="12.5" fill="#1c2b24">Command Execution · File Change</text>
+  <rect x="440" y="418" width="272" height="32" rx="16" fill="#ffffff" stroke="rgba(28,43,36,0.18)"/>
+  <text x="576" y="439" text-anchor="middle" class="mono" font-size="12.5" fill="#1c2b24">Tool Call · Approval</text>
+  <rect x="440" y="462" width="272" height="32" rx="16" fill="#ffffff" stroke="rgba(28,43,36,0.18)"/>
+  <text x="576" y="483" text-anchor="middle" class="mono" font-size="12.5" fill="#1c2b24">Turn Completed</text>
+
+  <!-- persistence annotation card -->
+  <rect x="776" y="196" width="380" height="340" rx="12" fill="#f3f1ea" stroke="rgba(28,43,36,0.18)"/>
+  <circle cx="800" cy="224" r="5" fill="#2e7d5b"/>
+  <text x="814" y="230" class="lbl" font-size="15" font-weight="600">落盘注记</text>
+  <text x="796" y="254" class="sub" font-size="12">rollout.jsonl · SQLite</text>
+
+  <rect x="792" y="270" width="348" height="150" rx="8" fill="#181d1a"/>
+  <g class="mono" font-size="12" fill="#e8f0eb">
+    <text x="808" y="298">{"t":"thread_started"}</text>
+    <text x="808" y="324">{"t":"turn_started"}</text>
+    <text x="808" y="350">{"t":"<tspan fill="#63b48e">item</tspan>","k":"user_input"}</text>
+    <text x="808" y="376">{"t":"<tspan fill="#63b48e">item</tspan>","k":"agent_message"}</text>
+    <text x="808" y="402">{"t":"<tspan fill="#e8a55a">turn_completed</tspan>"}</text>
+  </g>
+
+  <circle cx="800" cy="443" r="2.5" fill="#7b8a83"/>
+  <text x="814" y="448" class="lbl" font-size="12.5" fill="#40514a">jsonl：每行一个事件，append-only</text>
+  <circle cx="800" cy="473" r="2.5" fill="#7b8a83"/>
+  <text x="814" y="478" class="lbl" font-size="12.5" fill="#40514a">SQLite：thread / turn / item 三表</text>
+  <text x="814" y="502" class="lbl" font-size="12.5" fill="#40514a">外键级联，可 SQL 检索与 --resume</text>
+
+  <!-- arrowheads LAST (on top of everything) -->
+  <polygon points="224,182 217.5,170 230.5,170" fill="#40514a"/>
+  <polygon points="576,182 569.5,170 582.5,170" fill="#40514a"/>
+</svg>

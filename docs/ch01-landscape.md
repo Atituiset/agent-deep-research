@@ -6,18 +6,9 @@
 
 ## 1.1 Agent Infra 的层次
 
-```
-┌──────────────────────────────────────────────┐
-│  Agent Application（应用）                    │
-│  Claude Code / Codex CLI / OpenCode / Pi    │
-├──────────────────────────────────────────────┤
-│  Agent Infrastructure（基础设施）← 本书       │
-│  Runtime │ Context │ Tools │ Memory │ Obs    │
-├──────────────────────────────────────────────┤
-│  LLM API / Model Serving（模型层）           │
-│  Anthropic / OpenAI / DeepSeek / xAI / Qwen │
-└──────────────────────────────────────────────┘
-```
+![Agent Infra 三层架构图：应用层、基础设施层、模型层](/figures/fig-1-1-agent-infra-layers.svg)
+
+<p class="fig-caption">图 1-1 · Agent Infra 的三层架构：应用层向下调用、模型层向上支撑，夹在中间的 Agent Infrastructure 是本书的研究对象</p>
 
 传统软件与 Agent 软件的类比在九家源码中得到逐一印证：
 

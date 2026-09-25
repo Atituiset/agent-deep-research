@@ -264,3 +264,12 @@
     max-width: 640px;
   }
 }
+
+/* 图注（图 X-Y 标题） */
+.vp-doc .fig-caption {
+  text-align: center;
+  color: var(--vp-c-text-3);
+  font-size: 13.5px;
+  margin-top: -0.9em;
+  margin-bottom: 1.6em;
+}

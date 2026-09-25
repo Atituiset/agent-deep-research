@@ -1,0 +1,112 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 640" role="img" aria-label="Agent Infra 三层架构图：应用层、基础设施层、模型层">
+  <defs>
+    <style>
+      .lbl { font-family: Inter, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif; fill: #1c2b24; }
+      .sub { font-family: "JetBrains Mono", Menlo, monospace; fill: #7b8a83; }
+      .mono { font-family: "JetBrains Mono", Menlo, monospace; }
+    </style>
+  </defs>
+
+  <!-- light card (reads on both light & dark site themes) -->
+  <rect x="16" y="16" width="1168" height="608" rx="16" fill="#ffffff" stroke="rgba(28,43,36,0.12)"/>
+
+  <text x="64" y="54" class="mono" font-size="13" fill="#7b8a83">agent-infra layers · 三层架构</text>
+
+  <!-- ══ Layer 3: Agent Application ══ -->
+  <rect x="64" y="76" width="1072" height="130" rx="12" fill="#f3f1ea" stroke="rgba(28,43,36,0.18)"/>
+  <text x="96" y="124" class="lbl" font-size="19" font-weight="600">应用层</text>
+  <text x="96" y="150" class="mono" font-size="13" fill="#40514a">Agent Application</text>
+  <text x="96" y="174" class="lbl" font-size="12" fill="#7b8a83">用户直接交互的 CLI / TUI 产品</text>
+  <line x1="336" y1="96" x2="336" y2="186" stroke="rgba(28,43,36,0.12)"/>
+
+  <rect x="348" y="107" width="182" height="68" rx="10" fill="#ffffff" stroke="rgba(28,43,36,0.15)"/>
+  <text x="439" y="137" text-anchor="middle" class="lbl" font-size="15" font-weight="600">Claude Code</text>
+  <text x="439" y="157" text-anchor="middle" class="sub" font-size="11.5">anthropic · cli</text>
+
+  <rect x="546" y="107" width="182" height="68" rx="10" fill="#ffffff" stroke="rgba(28,43,36,0.15)"/>
+  <text x="637" y="137" text-anchor="middle" class="lbl" font-size="15" font-weight="600">Codex CLI</text>
+  <text x="637" y="157" text-anchor="middle" class="sub" font-size="11.5">openai · rust cli</text>
+
+  <rect x="744" y="107" width="182" height="68" rx="10" fill="#ffffff" stroke="rgba(28,43,36,0.15)"/>
+  <text x="835" y="137" text-anchor="middle" class="lbl" font-size="15" font-weight="600">OpenCode</text>
+  <text x="835" y="157" text-anchor="middle" class="sub" font-size="11.5">oss · ts tui</text>
+
+  <rect x="942" y="107" width="182" height="68" rx="10" fill="#ffffff" stroke="rgba(28,43,36,0.15)"/>
+  <text x="1033" y="137" text-anchor="middle" class="lbl" font-size="15" font-weight="600">Pi</text>
+  <text x="1033" y="157" text-anchor="middle" class="sub" font-size="11.5">minimal core · ts</text>
+
+  <!-- ══ Layer 2: Agent Infrastructure（本书研究对象，绿色描边强调） ══ -->
+  <rect x="64" y="262" width="1072" height="150" rx="12" fill="#f3f1ea" stroke="#2e7d5b" stroke-width="2"/>
+  <rect x="1002" y="274" width="122" height="24" rx="12" fill="#ffffff" stroke="#2e7d5b"/>
+  <text x="1063" y="290" text-anchor="middle" font-size="12" font-weight="600" fill="#2e7d5b" style="font-family: Inter, 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;">本书研究对象</text>
+
+  <text x="96" y="320" class="lbl" font-size="19" font-weight="600">基础设施层</text>
+  <text x="96" y="346" class="mono" font-size="13" fill="#40514a">Agent Infrastructure</text>
+  <text x="96" y="370" class="lbl" font-size="12" fill="#7b8a83">模型与产品之间的 Harness</text>
+  <line x1="336" y1="284" x2="336" y2="390" stroke="rgba(28,43,36,0.12)"/>
+
+  <rect x="345" y="306" width="146" height="88" rx="10" fill="#ffffff" stroke="rgba(28,43,36,0.15)"/>
+  <text x="418" y="340" text-anchor="middle" class="lbl" font-size="17" font-weight="600">运行时</text>
+  <text x="418" y="362" text-anchor="middle" class="mono" font-size="12" fill="#40514a">Runtime</text>
+  <text x="418" y="382" text-anchor="middle" class="sub" font-size="11">loop · turn</text>
+
+  <rect x="504" y="306" width="146" height="88" rx="10" fill="#ffffff" stroke="rgba(28,43,36,0.15)"/>
+  <text x="577" y="340" text-anchor="middle" class="lbl" font-size="17" font-weight="600">上下文</text>
+  <text x="577" y="362" text-anchor="middle" class="mono" font-size="12" fill="#40514a">Context</text>
+  <text x="577" y="382" text-anchor="middle" class="sub" font-size="11">projection</text>
+
+  <rect x="663" y="306" width="146" height="88" rx="10" fill="#ffffff" stroke="rgba(28,43,36,0.15)"/>
+  <text x="736" y="340" text-anchor="middle" class="lbl" font-size="17" font-weight="600">工具</text>
+  <text x="736" y="362" text-anchor="middle" class="mono" font-size="12" fill="#40514a">Tools</text>
+  <text x="736" y="382" text-anchor="middle" class="sub" font-size="11">registry · exec</text>
+
+  <rect x="822" y="306" width="146" height="88" rx="10" fill="#ffffff" stroke="rgba(28,43,36,0.15)"/>
+  <text x="895" y="340" text-anchor="middle" class="lbl" font-size="17" font-weight="600">记忆</text>
+  <text x="895" y="362" text-anchor="middle" class="mono" font-size="12" fill="#40514a">Memory</text>
+  <text x="895" y="382" text-anchor="middle" class="sub" font-size="11">compaction</text>
+
+  <rect x="981" y="306" width="146" height="88" rx="10" fill="#ffffff" stroke="rgba(28,43,36,0.15)"/>
+  <text x="1054" y="340" text-anchor="middle" class="lbl" font-size="17" font-weight="600">可观测</text>
+  <text x="1054" y="362" text-anchor="middle" class="mono" font-size="12" fill="#40514a">Obs</text>
+  <text x="1054" y="382" text-anchor="middle" class="sub" font-size="11">trace · otel</text>
+
+  <!-- ══ Layer 1: LLM API / Model Serving ══ -->
+  <rect x="64" y="468" width="1072" height="130" rx="12" fill="#f3f1ea" stroke="rgba(28,43,36,0.18)"/>
+  <text x="96" y="516" class="lbl" font-size="19" font-weight="600">模型层</text>
+  <text x="96" y="542" class="mono" font-size="13" fill="#40514a">LLM API / Model Serving</text>
+  <text x="96" y="566" class="lbl" font-size="12" fill="#7b8a83">采样与推理，API 即边界</text>
+  <line x1="336" y1="488" x2="336" y2="578" stroke="rgba(28,43,36,0.12)"/>
+
+  <rect x="348" y="499" width="182" height="68" rx="10" fill="#ffffff" stroke="rgba(28,43,36,0.15)"/>
+  <text x="439" y="529" text-anchor="middle" class="lbl" font-size="15" font-weight="600">Anthropic</text>
+  <text x="439" y="549" text-anchor="middle" class="sub" font-size="11.5">messages api</text>
+
+  <rect x="546" y="499" width="182" height="68" rx="10" fill="#ffffff" stroke="rgba(28,43,36,0.15)"/>
+  <text x="637" y="529" text-anchor="middle" class="lbl" font-size="15" font-weight="600">OpenAI</text>
+  <text x="637" y="549" text-anchor="middle" class="sub" font-size="11.5">responses api</text>
+
+  <rect x="744" y="499" width="182" height="68" rx="10" fill="#ffffff" stroke="rgba(28,43,36,0.15)"/>
+  <text x="835" y="529" text-anchor="middle" class="lbl" font-size="15" font-weight="600">DeepSeek</text>
+  <text x="835" y="549" text-anchor="middle" class="sub" font-size="11.5">openai-compatible</text>
+
+  <rect x="942" y="499" width="182" height="68" rx="10" fill="#ffffff" stroke="rgba(28,43,36,0.15)"/>
+  <text x="1033" y="529" text-anchor="middle" class="lbl" font-size="15" font-weight="600">Qwen</text>
+  <text x="1033" y="549" text-anchor="middle" class="sub" font-size="11.5">openai-compatible</text>
+
+  <!-- arrow shafts (down = 调用, up = 支撑); tips keep ≥14px from band edges -->
+  <line x1="540" y1="220" x2="540" y2="240" stroke="#40514a" stroke-width="1.8"/>
+  <line x1="660" y1="246" x2="660" y2="226" stroke="#40514a" stroke-width="1.8"/>
+  <text x="556" y="238" class="lbl" font-size="14" fill="#40514a">调用</text>
+  <text x="676" y="238" class="lbl" font-size="14" fill="#40514a">支撑</text>
+
+  <line x1="540" y1="426" x2="540" y2="446" stroke="#40514a" stroke-width="1.8"/>
+  <line x1="660" y1="452" x2="660" y2="432" stroke="#40514a" stroke-width="1.8"/>
+  <text x="556" y="444" class="lbl" font-size="14" fill="#40514a">调用</text>
+  <text x="676" y="444" class="lbl" font-size="14" fill="#40514a">支撑</text>
+
+  <!-- arrowheads LAST (on top of everything) -->
+  <polygon points="540,248 533,234 547,234" fill="#40514a"/>
+  <polygon points="660,220 653,234 667,234" fill="#40514a"/>
+  <polygon points="540,454 533,440 547,440" fill="#40514a"/>
+  <polygon points="660,426 653,440 667,440" fill="#40514a"/>
+</svg>

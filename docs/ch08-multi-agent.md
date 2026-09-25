@@ -151,6 +151,10 @@
 
 ### 9.1.4 编排拓扑 lineage：三种范式的分化
 
+![多 Agent 三种编排拓扑对比：Orchestrator-Worker 主从分发与回流、Swarm 对等消息网、Hierarchical 限一层嵌套的分层树](/figures/fig-9-1-multi-agent-topologies.svg)
+
+<p class="fig-caption">图 9-1 · 三种编排拓扑对比：Orchestrator-Worker 由主 Agent 派发并回流汇总，Swarm 对等节点经消息传递组网，Hierarchical 以限 1 层嵌套的分层树做 SOP 分解</p>
+
 ```
 Orchestrator-Worker (主从)
    主 Agent 负责分解与汇总，Worker 只读或隔离写

@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 560" role="img" aria-label="Tool Calling 流水线：Schema 注册 → 结构化调用 → Tool Router → 审批与沙箱双闸门执行 → 结果回填闭环">
+  <defs>
+    <style>
+      .lbl { font-family: Inter, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif; fill: #1c2b24; }
+      .sub { font-family: "JetBrains Mono", Menlo, monospace; fill: #7b8a83; }
+      .mono { font-family: "JetBrains Mono", Menlo, monospace; }
+    </style>
+  </defs>
+
+  <!-- light card (reads on both light & dark site themes) -->
+  <rect x="16" y="16" width="1168" height="528" rx="16" fill="#ffffff" stroke="rgba(28,43,36,0.12)"/>
+
+  <!-- ============ STEP 1: Schema 注册 ============ -->
+  <rect x="40" y="140" width="180" height="320" rx="12" fill="#f3f1ea" stroke="rgba(28,43,36,0.18)" stroke-width="1.5"/>
+  <text x="60" y="172" class="sub" font-size="11" letter-spacing="1.5">STEP 1</text>
+  <text x="60" y="198" class="lbl" font-size="18" font-weight="600">Schema 注册</text>
+  <text x="60" y="222" class="sub" font-size="12.5">register(spec)</text>
+  <line x1="60" y1="238" x2="200" y2="238" stroke="rgba(28,43,36,0.12)"/>
+  <text x="60" y="266" class="lbl" font-size="13.5">名称</text>
+  <text x="60" y="286" class="sub" font-size="12">name</text>
+  <text x="60" y="316" class="lbl" font-size="13.5">用途</text>
+  <text x="60" y="336" class="sub" font-size="12">description</text>
+  <text x="60" y="366" class="lbl" font-size="13.5">参数约束</text>
+  <text x="60" y="386" class="sub" font-size="12">parameters</text>
+  <rect x="70" y="408" width="120" height="28" rx="14" fill="#ffffff" stroke="rgba(28,43,36,0.18)"/>
+  <text x="130" y="427" text-anchor="middle" class="mono" font-size="12" fill="#40514a">JSON Schema</text>
+
+  <!-- ============ STEP 2: 结构化调用 (dark panel) ============ -->
+  <rect x="250" y="140" width="280" height="320" rx="12" fill="#181d1a"/>
+  <text x="274" y="168" class="mono" font-size="11.5" fill="#82918a">STEP 2 · tool_calls[0]</text>
+  <circle cx="500" cy="164" r="5" fill="#63b48e"/>
+  <g class="mono" font-size="14" fill="#e8f0eb">
+    <text x="274" y="204">{</text>
+    <text x="292" y="234">"id": <tspan fill="#e8a55a">"call_01"</tspan>,</text>
+    <text x="292" y="264">"type": "function",</text>
+    <text x="292" y="294">"function": {</text>
+    <text x="310" y="324">"name": <tspan fill="#63b48e">"bash"</tspan>,</text>
+    <text x="310" y="354">"arguments": "{…}"</text>
+    <text x="292" y="384">}</text>
+    <text x="274" y="414">}</text>
+  </g>
+  <text x="274" y="444" class="mono" font-size="12" fill="#82918a">模型只产出调用意图，不执行</text>
+
+  <!-- ============ STEP 3: Tool Router (green highlight) ============ -->
+  <rect x="560" y="140" width="180" height="320" rx="12" fill="rgba(46,125,91,0.10)" stroke="#2e7d5b" stroke-width="2"/>
+  <text x="580" y="172" class="mono" font-size="11" fill="#2e7d5b" letter-spacing="1.5">STEP 3</text>
+  <text x="580" y="198" class="lbl" font-size="18" font-weight="600">Tool Router</text>
+  <text x="580" y="222" class="sub" font-size="12.5">route(call)</text>
+  <line x1="580" y1="238" x2="720" y2="238" stroke="rgba(28,43,36,0.12)"/>
+  <text x="580" y="266" class="lbl" font-size="13.5">校验参数</text>
+  <text x="580" y="286" class="sub" font-size="12">validate(args)</text>
+  <text x="580" y="316" class="lbl" font-size="13.5">按名路由</text>
+  <text x="580" y="336" class="sub" font-size="12">dispatch(name)</text>
+  <rect x="590" y="408" width="120" height="28" rx="14" fill="#ffffff" stroke="rgba(46,125,91,0.45)"/>
+  <text x="650" y="427" text-anchor="middle" class="mono" font-size="12" fill="#2e7d5b">name → exec</text>
+
+  <!-- ============ STEP 4: 执行 (双闸门) ============ -->
+  <rect x="770" y="140" width="180" height="320" rx="12" fill="#f3f1ea" stroke="rgba(28,43,36,0.18)" stroke-width="1.5"/>
+  <text x="790" y="172" class="sub" font-size="11" letter-spacing="1.5">STEP 4</text>
+  <text x="790" y="198" class="lbl" font-size="18" font-weight="600">执行</text>
+  <text x="790" y="222" class="sub" font-size="12.5">execute(args)</text>
+  <line x1="790" y1="238" x2="930" y2="238" stroke="rgba(28,43,36,0.12)"/>
+  <!-- gate 1: Approval -->
+  <rect x="790" y="254" width="140" height="56" rx="10" fill="#ffffff" stroke="rgba(28,43,36,0.18)"/>
+  <path d="M 814 266 l 9 4 v 7 c 0 7 -4.5 10.5 -9 12.5 c -4.5 -2 -9 -5.5 -9 -12.5 v -7 z" fill="none" stroke="#40514a" stroke-width="1.6" stroke-linejoin="round"/>
+  <path d="M 810 278 l 3 3 l 6 -6" fill="none" stroke="#40514a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="836" y="279" class="lbl" font-size="14.5" font-weight="600">审批</text>
+  <text x="836" y="297" class="sub" font-size="11">Approval</text>
+  <!-- gate 2: Sandbox -->
+  <rect x="790" y="326" width="140" height="56" rx="10" fill="#ffffff" stroke="rgba(28,43,36,0.18)"/>
+  <rect x="806" y="340" width="18" height="18" rx="3" fill="none" stroke="#40514a" stroke-width="1.6" stroke-dasharray="4 3"/>
+  <rect x="811" y="345" width="8" height="8" rx="1.5" fill="#40514a"/>
+  <text x="836" y="351" class="lbl" font-size="14.5" font-weight="600">沙箱</text>
+  <text x="836" y="369" class="sub" font-size="11">Sandbox</text>
+  <text x="860" y="420" text-anchor="middle" class="sub" font-size="11">bwrap / worktree</text>
+
+  <!-- ============ STEP 5: Result 回填 ============ -->
+  <rect x="980" y="140" width="180" height="320" rx="12" fill="#f3f1ea" stroke="rgba(28,43,36,0.18)" stroke-width="1.5"/>
+  <text x="1000" y="172" class="sub" font-size="11" letter-spacing="1.5">STEP 5</text>
+  <text x="1000" y="198" class="lbl" font-size="18" font-weight="600">Result 回填</text>
+  <text x="1000" y="222" class="sub" font-size="12.5">append(result)</text>
+  <line x1="1000" y1="238" x2="1140" y2="238" stroke="rgba(28,43,36,0.12)"/>
+  <text x="1000" y="266" class="lbl" font-size="13.5">调用 ID</text>
+  <text x="1000" y="286" class="sub" font-size="12">tool_call_id</text>
+  <text x="1000" y="316" class="lbl" font-size="13.5">状态</text>
+  <text x="1000" y="336" class="sub" font-size="12">status: ok</text>
+  <text x="1000" y="366" class="lbl" font-size="13.5">返回值</text>
+  <text x="1000" y="386" class="sub" font-size="12">result</text>
+  <rect x="1010" y="408" width="120" height="28" rx="14" fill="#ffffff" stroke="rgba(28,43,36,0.18)"/>
+  <text x="1070" y="427" text-anchor="middle" class="mono" font-size="12" fill="#40514a">role: tool</text>
+
+  <!-- ============ flow paths ============ -->
+  <path d="M 224 300 H 232" fill="none" stroke="#40514a" stroke-width="1.8"/>
+  <path d="M 534 300 H 542" fill="none" stroke="#40514a" stroke-width="1.8"/>
+  <path d="M 744 300 H 752" fill="none" stroke="#40514a" stroke-width="1.8"/>
+  <path d="M 954 300 H 962" fill="none" stroke="#40514a" stroke-width="1.8"/>
+  <path d="M 860 312 V 322" fill="none" stroke="#40514a" stroke-width="1.6"/>
+  <!-- loop-back: ⑤ → ② -->
+  <path d="M 1070 464 V 506 H 390 V 482" fill="none" stroke="#40514a" stroke-width="1.8" stroke-linejoin="round"/>
+  <text x="730" y="497" text-anchor="middle" class="mono" font-size="12.5" fill="#40514a">tool_result 回填上下文 → 触发下一轮采样</text>
+
+  <!-- ============ arrowheads LAST (on top of everything) ============ -->
+  <polygon points="236,300 224,294 224,306" fill="#40514a"/>
+  <polygon points="546,300 534,294 534,306" fill="#40514a"/>
+  <polygon points="756,300 744,294 744,306" fill="#40514a"/>
+  <polygon points="966,300 954,294 954,306" fill="#40514a"/>
+  <polygon points="860,322 854,312 866,312" fill="#40514a"/>
+  <polygon points="390,474 384,486 396,486" fill="#40514a"/>
+</svg>
