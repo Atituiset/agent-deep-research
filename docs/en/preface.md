@@ -1,5 +1,7 @@
 # Preface
 
+> **On naming**: *Agent Deep Research* is the title of this project; *Agent Infra* is the field it studies. Throughout the book we call that layer the **Harness** — the run-and-govern layer inside the agent but outside the model. Treat the two as synonyms.
+
 > This is a **hands-on, verifiable Agent knowledge map** — built from 9 real codebases as its textbook (the theory volume T1–T7 has been merged in as Volume VI). Every component is traced from its paper lineage, to line-level source verification, to your own Lab.
 >
 > **If you have only ever *used* Agents**: start directly with [Chapter 0](/ch00-user-phenomena) (zh) — it translates every usage phenomenon you've already seen (compaction popups, permission prompts, /resume, truncation markers...) into the concepts used throughout the book. You've met every mechanism already; you just don't know its name yet.

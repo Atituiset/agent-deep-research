@@ -4,6 +4,8 @@
 
 The book's governing formula is: **Agent = Model + Harness**. The Model handles sampling and reasoning; the Harness handles everything else — scheduling, tools, memory, persistence, and guardrails. The Harness's internal structure is formalized in [Chapter 2](./ch02-common-model.md) as the **six-piece set**: Prompt, Loop, Tools, Context, Session, and the Model abstraction (the adaptation layer over the various underlying LLMs). The nine-implementation panorama in this chapter is positioned by the trade-offs each one makes across these six pieces.
 
+**A note on naming**: *Agent Deep Research* is this project's title; *Agent Infra* is the field it studies. The book calls that layer the **Harness** (see the master formula above) — read the three as synonyms.
+
 ## 1.1 The Layers of Agent Infra
 
 ![Three-layer architecture of Agent Infra: application layer, infrastructure layer, model layer](/figures/fig-1-1-agent-infra-layers.svg)

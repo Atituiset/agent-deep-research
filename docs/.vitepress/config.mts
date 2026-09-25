@@ -6,7 +6,7 @@ export default defineConfig({
   title: 'Agent Deep Research',
   titleTemplate: '九家 Agent 实现思想对比',
   description:
-    'Agent Infra 知识地图：以 Claude Code / Codex / Grok / DeepSeek / OpenCode / Pi / Claw / Qwen-Agent / Hermes 九家实现为教材，每章按「论文脉络 → 原理深潜 → 源码对证 → 权衡结论 → 未来方向」五段式展开',
+    'Agent Deep Research（九家 Agent Harness 实现对比）：以 Claude Code / Codex / Grok / DeepSeek / OpenCode / Pi / Claw / Qwen-Agent / Hermes 九家实现为教材，每章按「论文脉络 → 原理深潜 → 源码对证 → 权衡结论 → 未来方向」五段式展开',
 
   // GitHub Pages 项目站点 https://atituiset.github.io/agent-deep-research/
   base: '/agent-deep-research/',

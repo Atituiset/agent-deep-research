@@ -4,6 +4,8 @@
 
 本书的统摄公式是：**Agent = Model + Harness**。Model 负责采样与推理，Harness 负责其余一切——调度、工具、记忆、持久化与防护。Harness 的内部结构在[第 2 章](./ch02-common-model.md)被形式化为**六件套**：Prompt、Loop、Tools、Context、Session、Model 抽象（对底层各家 LLM 的适配层）。本章的九家全景，就是按各家在这六件套上的取舍来定位的。
 
+**一个交代**：书名 *Agent Deep Research* 是本研究项目的名字；研究对象 *Agent Infra*（Agent 基础设施）是领域名。本书统一用 **Harness** 指代这一层（见上文的统摄公式），读法上三者同义。
+
 ## 1.1 Agent Infra 的层次
 
 ![Agent Infra 三层架构图：应用层、基础设施层、模型层](/figures/fig-1-1-agent-infra-layers.svg)

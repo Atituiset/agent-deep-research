@@ -1,5 +1,7 @@
 # Agent Deep Research — How 9 Agent Harnesses Really Work
 
+> **Naming**: *Agent Deep Research* is the project/book title; *Agent Infra* is the field it studies. Inside the book we call that layer the **Harness** — same thing, engineering view. 书名 Agent Deep Research，研究对象 Agent Infra（Agent 基础设施），书中统一以 Harness 指代该层。
+
 [![Read Online](https://img.shields.io/badge/read-GitHub%20Pages-blue)](https://atituiset.github.io/agent-deep-research/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![English Edition](https://img.shields.io/badge/English%20edition-in%20progress-brightgreen)](https://atituiset.github.io/agent-deep-research/en/)

@@ -3,7 +3,7 @@ layout: home
 
 hero:
   name: Agent Deep Research
-  text: 九家 Agent 实现思想对比
+  text: 九家 Agent Harness 实现思想对比
   tagline: 以 Claude Code / Codex / Grok / DeepSeek / OpenCode / Pi / Claw / Qwen-Agent / Hermes 九家实现为教材的 Agent Infra 知识地图
   actions:
     - theme: brand
